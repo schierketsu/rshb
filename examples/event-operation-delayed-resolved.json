@@ -1,0 +1,45 @@
+{
+  "specVersion": "1.0",
+  "eventId": "0192f1a7-9a01-7f10-8c3d-2b4a6c8e0f33",
+  "eventType": "OPERATION_DELAYED",
+  "category": "OPERATION",
+  "state": "RESOLVED",
+  "severity": "INFO",
+  "occurredAt": "2026-10-26T11:30:00+03:00",
+  "detectedAt": "2026-10-26T11:58:05+03:00",
+  "sequence": 2,
+  "correlationKey": "TREASURY_FX_MM_SETTLEMENT:OPERATION_DELAYED",
+  "source": {
+    "system": "DIASOFT_FA_TREASURY_BACK",
+    "instance": "tb-app-prod-02",
+    "module": "SETTLEMENT",
+    "environment": "PROD",
+    "adapterVersion": "1.4.0"
+  },
+  "service": {
+    "code": "TREASURY_FX_MM_SETTLEMENT",
+    "ciId": "CI-TB-SETTL-01",
+    "name": "Расчёты по сделкам FX и МБК"
+  },
+  "operation": {
+    "id": "FX-2026-834724",
+    "type": "FX_SWAP",
+    "status": "SETTLED",
+    "stage": "SETTLEMENT",
+    "valueDate": "2026-10-26",
+    "currency": "USD",
+    "amountClass": "LARGE"
+  },
+  "metrics": {
+    "expectedDurationSec": 300,
+    "actualDurationSec": 1685,
+    "deviationPct": 461.7,
+    "threshold": 300
+  },
+  "sla": {
+    "slaCode": "SLA-TRS-SETTL",
+    "deadline": "2026-10-26T15:30:00+03:00",
+    "breached": false
+  },
+  "message": "Расчёт по сделке FX-2026-834724 завершён, задержка устранена"
+}

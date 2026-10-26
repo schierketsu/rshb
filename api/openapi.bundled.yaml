@@ -1,0 +1,1256 @@
+# Автоматически собрано tools/bundle_openapi.py из openapi.yaml — не редактировать вручную
+openapi: 3.1.0
+info:
+  title: Divo Treasury Integration API
+  version: 1.0.0
+  summary: Приём событий мониторинга из Diasoft FA# Treasury.Back в ESM-платформу «Диво»
+  description: "API публикуется интеграционным слоем «Диво Сервис» и вызывается Integration Adapter\n(Treasury Event\
+    \ Gateway), который стоит между Diasoft FA# Treasury.Back и «Диво».\n\nПринципы:\n* **Push по событию** для\
+    \ критичных событий (`/events`), **пакетом по расписанию** для\n  агрегированных метрик (`/metrics`), **heartbeat**\
+    \ раз в 60 с (`/heartbeat`).\n* **Идемпотентность**: ключ — `eventId` (он же заголовок `Idempotency-Key`). Повторная\
+    \ доставка\n  возвращает `200 DUPLICATE` и не создаёт второй инцидент.\n* **Асинхронная обработка**: `202 Accepted`\
+    \ означает «событие надёжно сохранено»,\n  корреляция и создание инцидента идут дальше; результат — `GET /events/{eventId}`.\n\
+    * Ошибки — в формате RFC 9457 (`application/problem+json`).\n* Банковская тайна и персональные данные не передаются.\n"
+  contact:
+    name: Команда интеграции казначейского блока
+servers:
+- url: https://api-gw.rshb.local/divo/api/v1/integrations/treasury
+  description: PROD (через корпоративный API Gateway)
+- url: https://api-gw-test.rshb.local/divo/api/v1/integrations/treasury
+  description: TEST
+security:
+- mtls: []
+  oauth2:
+  - treasury.events.write
+tags:
+- name: Events
+  description: События мониторинга
+- name: Metrics
+  description: Периодические метрики качества ИТ-услуг
+- name: Health
+  description: Контроль живости самой интеграции
+paths:
+  /events:
+    post:
+      tags:
+      - Events
+      operationId: submitEvent
+      summary: Передать одно событие
+      description: 'Основной канал. Адаптер вызывает метод сразу после обнаружения проблемы (push).
+
+        «Диво» синхронно валидирует событие, сохраняет его и отвечает `202`; корреляция
+
+        и создание инцидента выполняются асинхронно (обычно < 2 с).
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TreasuryEvent'
+            examples:
+              operationDelayed:
+                summary: Задержка расчёта по сделке FX
+                value:
+                  specVersion: '1.0'
+                  eventId: 0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+                  eventType: OPERATION_DELAYED
+                  category: OPERATION
+                  state: FIRING
+                  severity: MAJOR
+                  occurredAt: '2026-10-26T11:30:00+03:00'
+                  detectedAt: '2026-10-26T11:47:21+03:00'
+                  sequence: 1
+                  correlationKey: TREASURY_FX_MM_SETTLEMENT:OPERATION_DELAYED
+                  source:
+                    system: DIASOFT_FA_TREASURY_BACK
+                    instance: tb-app-prod-02
+                    module: SETTLEMENT
+                    environment: PROD
+                    adapterVersion: 1.4.0
+                  service:
+                    code: TREASURY_FX_MM_SETTLEMENT
+                    ciId: CI-TB-SETTL-01
+                    name: Расчёты по сделкам FX и МБК
+                  operation:
+                    id: FX-2026-834724
+                    type: FX_SWAP
+                    status: PROCESSING
+                    stage: SETTLEMENT
+                    valueDate: '2026-10-26'
+                    currency: USD
+                    amountClass: LARGE
+                  metrics:
+                    expectedDurationSec: 300
+                    actualDurationSec: 1320
+                    deviationPct: 340.0
+                    threshold: 300
+                  sla:
+                    slaCode: SLA-TRS-SETTL
+                    deadline: '2026-10-26T15:30:00+03:00'
+                    breached: false
+                    timeToBreachSec: 13359
+                  message: Превышено нормативное время расчёта по сделке FX-2026-834724 (22 мин при нормативе 5
+                    мин), валютирование сегодня
+                  details:
+                    errorCode: TB-SETTL-WAIT-ACK
+                    errorText: Нет подтверждения исполнения платёжного поручения от расчётной системы
+                    runbookUrl: https://wiki.rshb.local/runbooks/treasury/settlement-delay
+                  tags:
+                  - value-date-today
+                  - usd
+              resolved:
+                summary: Задержка устранена (RESOLVED)
+                value:
+                  specVersion: '1.0'
+                  eventId: 0192f1a7-9a01-7f10-8c3d-2b4a6c8e0f33
+                  eventType: OPERATION_DELAYED
+                  category: OPERATION
+                  state: RESOLVED
+                  severity: INFO
+                  occurredAt: '2026-10-26T11:30:00+03:00'
+                  detectedAt: '2026-10-26T11:58:05+03:00'
+                  sequence: 2
+                  correlationKey: TREASURY_FX_MM_SETTLEMENT:OPERATION_DELAYED
+                  source:
+                    system: DIASOFT_FA_TREASURY_BACK
+                    instance: tb-app-prod-02
+                    module: SETTLEMENT
+                    environment: PROD
+                    adapterVersion: 1.4.0
+                  service:
+                    code: TREASURY_FX_MM_SETTLEMENT
+                    ciId: CI-TB-SETTL-01
+                    name: Расчёты по сделкам FX и МБК
+                  operation:
+                    id: FX-2026-834724
+                    type: FX_SWAP
+                    status: SETTLED
+                    stage: SETTLEMENT
+                    valueDate: '2026-10-26'
+                    currency: USD
+                    amountClass: LARGE
+                  metrics:
+                    expectedDurationSec: 300
+                    actualDurationSec: 1685
+                    deviationPct: 461.7
+                    threshold: 300
+                  sla:
+                    slaCode: SLA-TRS-SETTL
+                    deadline: '2026-10-26T15:30:00+03:00'
+                    breached: false
+                  message: Расчёт по сделке FX-2026-834724 завершён, задержка устранена
+      responses:
+        '202':
+          description: Событие принято и надёжно сохранено, обработка асинхронная
+          headers:
+            Location:
+              description: URL статуса обработки
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitResult'
+              example:
+                eventId: 0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+                status: ACCEPTED
+                receivedAt: '2026-10-26T11:47:22.105+03:00'
+                statusUrl: /api/v1/integrations/treasury/events/0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+        '200':
+          description: Событие с таким eventId уже принято ранее (идемпотентный повтор). Повторно не обрабатывается.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitResult'
+              example:
+                eventId: 0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+                status: DUPLICATE
+                receivedAt: '2026-10-26T11:47:22.105+03:00'
+                statusUrl: /api/v1/integrations/treasury/events/0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /events/batch:
+    post:
+      tags:
+      - Events
+      operationId: submitEventsBatch
+      summary: Передать пакет событий (до 500)
+      description: 'Используется для **досылки накопленных событий** после восстановления «Диво»
+
+        (разбор outbox) и при пиковой нагрузке (закрытие дня). Каждое событие
+
+        обрабатывается независимо, результат — по каждому элементу (`207 Multi-Status`).
+
+        Адаптер повторяет только элементы с кодами 429/5xx.
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - batchId
+              - events
+              properties:
+                batchId:
+                  type: string
+                  format: uuid
+                  description: Идентификатор пакета (для журналов и трассировки)
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  description: События, упорядоченные по occurredAt
+                  items:
+                    $ref: '#/components/schemas/TreasuryEvent'
+            examples:
+              batch:
+                value:
+                  batchId: 0192f1a8-0000-7000-8000-000000000001
+                  events:
+                  - specVersion: '1.0'
+                    eventId: 0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+                    eventType: OPERATION_DELAYED
+                    category: OPERATION
+                    state: FIRING
+                    severity: MAJOR
+                    occurredAt: '2026-10-26T11:30:00+03:00'
+                    detectedAt: '2026-10-26T11:47:21+03:00'
+                    sequence: 1
+                    correlationKey: TREASURY_FX_MM_SETTLEMENT:OPERATION_DELAYED
+                    source:
+                      system: DIASOFT_FA_TREASURY_BACK
+                      instance: tb-app-prod-02
+                      module: SETTLEMENT
+                      environment: PROD
+                      adapterVersion: 1.4.0
+                    service:
+                      code: TREASURY_FX_MM_SETTLEMENT
+                      ciId: CI-TB-SETTL-01
+                      name: Расчёты по сделкам FX и МБК
+                    operation:
+                      id: FX-2026-834724
+                      type: FX_SWAP
+                      status: PROCESSING
+                      stage: SETTLEMENT
+                      valueDate: '2026-10-26'
+                      currency: USD
+                      amountClass: LARGE
+                    metrics:
+                      expectedDurationSec: 300
+                      actualDurationSec: 1320
+                      deviationPct: 340.0
+                      threshold: 300
+                    sla:
+                      slaCode: SLA-TRS-SETTL
+                      deadline: '2026-10-26T15:30:00+03:00'
+                      breached: false
+                      timeToBreachSec: 13359
+                    message: Превышено нормативное время расчёта по сделке FX-2026-834724 (22 мин при нормативе
+                      5 мин), валютирование сегодня
+                    details:
+                      errorCode: TB-SETTL-WAIT-ACK
+                      errorText: Нет подтверждения исполнения платёжного поручения от расчётной системы
+                      runbookUrl: https://wiki.rshb.local/runbooks/treasury/settlement-delay
+                    tags:
+                    - value-date-today
+                    - usd
+                  - specVersion: '1.0'
+                    eventId: 0192f1a5-0b11-7c02-a3f7-9e1d2c3b4a55
+                    eventType: SETTLEMENT_REJECTED
+                    category: OPERATION
+                    state: FIRING
+                    severity: CRITICAL
+                    occurredAt: '2026-10-26T12:04:09+03:00'
+                    detectedAt: '2026-10-26T12:04:40+03:00'
+                    sequence: 1
+                    correlationKey: TREASURY_SEC_SETTLEMENT:SETTLEMENT_REJECTED
+                    source:
+                      system: DIASOFT_FA_TREASURY_BACK
+                      instance: tb-app-prod-02
+                      module: SECURITIES
+                      environment: PROD
+                      adapterVersion: 1.4.0
+                    service:
+                      code: TREASURY_SEC_SETTLEMENT
+                      ciId: CI-TB-SEC-01
+                      name: Расчёты по ценным бумагам и РЕПО
+                    operation:
+                      id: REPO-2026-118204
+                      type: REPO
+                      status: REJECTED
+                      stage: SETTLEMENT
+                      valueDate: '2026-10-26'
+                      currency: RUB
+                      amountClass: VERY_LARGE
+                    sla:
+                      slaCode: SLA-TRS-SEC
+                      breached: true
+                    message: Поручение на расчёты по сделке РЕПО REPO-2026-118204 отклонено депозитарием
+                    details:
+                      errorCode: NSD-REJ-4012
+                      errorText: Несоответствие реквизитов встречного поручения
+                      gateway: NSD
+      responses:
+        '207':
+          description: Пакет обработан, результат по каждому событию
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResult'
+              examples:
+                partial:
+                  value:
+                    batchId: 0192f1a8-0000-7000-8000-000000000001
+                    accepted: 1
+                    duplicates: 0
+                    rejected: 1
+                    results:
+                    - eventId: 0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+                      httpStatus: 202
+                      status: ACCEPTED
+                    - eventId: 0192f1a5-0b11-7c02-a3f7-9e1d2c3b4a55
+                      httpStatus: 422
+                      status: REJECTED
+                      error:
+                        code: UNKNOWN_CI
+                        message: КЕ CI-TB-SEC-01 не найдена в CMDB
+                        field: service.ciId
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /events/{eventId}:
+    get:
+      tags:
+      - Events
+      operationId: getEventStatus
+      summary: Статус обработки события
+      description: 'Позволяет адаптеру (и сопровождению) проверить, чем закончилась обработка:
+
+        событие сгруппировано в оповещение, создан инцидент, подавлено (плановые работы)
+
+        или отклонено. Используется для сверки после сбоев доставки.
+
+        '
+      security:
+      - mtls: []
+        oauth2:
+        - treasury.events.read
+      parameters:
+      - name: eventId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Статус найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventStatus'
+              examples:
+                incidentCreated:
+                  value:
+                    eventId: 0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+                    processingStatus: INCIDENT_CREATED
+                    receivedAt: '2026-10-26T11:47:22.105+03:00'
+                    processedAt: '2026-10-26T11:47:23.410+03:00'
+                    correlation:
+                      correlationKey: TREASURY_FX_MM_SETTLEMENT:OPERATION_DELAYED
+                      alertId: ALR-552190
+                      eventsInAlert: 6
+                    incident:
+                      id: INC-18493
+                      priority: P2
+                      status: IN_PROGRESS
+                      assignmentGroup: Сопровождение Diasoft Treasury
+                      url: https://divo.rshb.local/service/incident/INC-18493
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Событие с таким eventId не поступало (адаптер должен отправить его повторно)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /metrics:
+    post:
+      tags:
+      - Metrics
+      operationId: submitMetricsSnapshot
+      summary: Передать агрегированные метрики за период (раз в 5 минут)
+      description: 'Режим «по расписанию». Не создаёт инцидентов напрямую — питает дашборды
+
+        «Диво Мера», расчёт доступности/SLA и тренды (раннее обнаружение деградации).
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricsSnapshot'
+            examples:
+              snapshot:
+                value:
+                  snapshotId: 0192f1a9-0000-7000-8000-000000000042
+                  periodStart: '2026-10-26T11:40:00+03:00'
+                  periodEnd: '2026-10-26T11:45:00+03:00'
+                  source:
+                    system: DIASOFT_FA_TREASURY_BACK
+                    environment: PROD
+                  services:
+                  - serviceCode: TREASURY_FX_MM_SETTLEMENT
+                    operationsProcessed: 184
+                    operationsInTimePct: 96.7
+                    p95DurationSec: 212
+                    queueDepth: 7
+                    errors: 1
+                  - serviceCode: TREASURY_SEC_SETTLEMENT
+                    operationsProcessed: 63
+                    operationsInTimePct: 100.0
+                    p95DurationSec: 95
+                    queueDepth: 0
+                    errors: 0
+                  - serviceCode: TREASURY_DEAL_CAPTURE
+                    operationsProcessed: 241
+                    operationsInTimePct: 99.6
+                    p95DurationSec: 18
+                    queueDepth: 2
+                    errors: 0
+      responses:
+        '202':
+          description: Снимок метрик принят
+        '200':
+          description: Снимок с таким snapshotId уже принят (идемпотентный повтор)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /heartbeat:
+    post:
+      tags:
+      - Health
+      operationId: sendHeartbeat
+      summary: Сигнал живости адаптера (раз в 60 с)
+      description: '«Dead man''s switch»: если «Диво» не получает heartbeat дольше 3 интервалов,
+
+        оно само регистрирует событие `INTEGRATION_HEARTBEAT_LOST`. Так обнаруживается
+
+        ситуация, когда упал сам адаптер и событий нет не потому, что всё хорошо.
+
+        В теле — состояние источника и очереди адаптера (растущий outbox = проблема доставки).
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Heartbeat'
+            examples:
+              ok:
+                value:
+                  adapterId: treasury-adapter-prod-01
+                  adapterVersion: 1.4.0
+                  sentAt: '2026-10-26T11:48:00+03:00'
+                  intervalSec: 60
+                  source:
+                    system: DIASOFT_FA_TREASURY_BACK
+                    reachable: true
+                    lastSuccessfulPollAt: '2026-10-26T11:47:55+03:00'
+                  outbox:
+                    pending: 0
+                    oldestPendingAgeSec: 0
+                    deadLetter: 0
+      responses:
+        '204':
+          description: Heartbeat принят
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+components:
+  securitySchemes:
+    mtls:
+      type: mutualTLS
+      description: Взаимная TLS-аутентификация по сертификату адаптера, выпущенному УЦ банка
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://sso.rshb.local/oauth2/token
+          scopes:
+            treasury.events.write: Передача событий, метрик и heartbeat
+            treasury.events.read: Чтение статусов обработки
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Совпадает с eventId (для /metrics — со snapshotId). Повтор с тем же ключом и тем же телом → 200;
+        с другим телом → 409.
+      schema:
+        type: string
+        format: uuid
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: Идентификатор запроса для сквозной трассировки (адаптер → API Gateway → «Диво»)
+      schema:
+        type: string
+        maxLength: 64
+  responses:
+    BadRequest:
+      description: Некорректный JSON или нарушена структура запроса. Повтор бессмысленен → DLQ.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: Нет/истёк токен или недействителен клиентский сертификат. Адаптер обновляет токен и повторяет.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: У клиента нет прав (scope) или источник не зарегистрирован. Повтор бессмысленен → DLQ + оповещение.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    IdempotencyConflict:
+      description: eventId уже использован с другим содержимым — ошибка адаптера. → DLQ.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PayloadTooLarge:
+      description: Превышен размер запроса (событие > 64 КБ или пакет > 500 событий). Адаптер дробит пакет.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ValidationError:
+      description: JSON корректен, но не соответствует схеме или каталогу (неизвестная ИТ-услуга/КЕ). Повтор бессмысленен
+        → DLQ.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              value:
+                type: https://divo.rshb.local/problems/validation-error
+                title: Событие не прошло валидацию
+                status: 422
+                code: VALIDATION_ERROR
+                traceId: 7f3c2a9e41b0d8c6
+                errors:
+                - field: service.code
+                  message: Значение TREASURY_FX не входит в каталог ИТ-услуг
+                - field: occurredAt
+                  message: Ожидается дата-время ISO 8601 с часовым поясом
+    TooManyRequests:
+      description: Превышен лимит запросов. Адаптер ждёт Retry-After и повторяет.
+      headers:
+        Retry-After:
+          description: Через сколько секунд повторить
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: «Диво» временно недоступно. Событие остаётся в outbox адаптера, повтор с экспоненциальной задержкой.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    TreasuryEvent:
+      title: TreasuryEvent
+      description: 'Событие мониторинга казначейского ИТ-сервиса, передаваемое из Diasoft FA# Treasury.Back (через
+        Integration Adapter) в ESM-платформу «Диво». Банковская тайна и персональные данные не передаются: только
+        технические идентификаторы, статусы и метрики.'
+      type: object
+      additionalProperties: false
+      required:
+      - specVersion
+      - eventId
+      - eventType
+      - category
+      - state
+      - severity
+      - occurredAt
+      - detectedAt
+      - correlationKey
+      - source
+      - service
+      - message
+      properties:
+        specVersion:
+          description: Версия контракта. Позволяет «Диво» обрабатывать старые и новые версии событий параллельно.
+          type: string
+          const: '1.0'
+        eventId:
+          description: 'Глобально уникальный идентификатор события (UUID v7, упорядочен по времени). Ключ идемпотентности:
+            повторная доставка с тем же eventId не создаёт дубль.'
+          type: string
+          format: uuid
+        eventType:
+          description: Тип события из каталога событий интеграции (docs/02-concept.md).
+          type: string
+          enum:
+          - OPERATION_DELAYED
+          - OPERATION_FAILED
+          - SETTLEMENT_REJECTED
+          - PROCESSING_BACKLOG
+          - EOD_CLOSE_DELAYED
+          - EOD_STEP_FAILED
+          - MARKET_DATA_STALE
+          - EXTERNAL_GATEWAY_ERROR
+          - BATCH_JOB_FAILED
+          - SYSTEM_UNAVAILABLE
+          - SYSTEM_DEGRADED
+        category:
+          description: 'Уровень, на котором возникла проблема: отдельная операция, бизнес-процесс, система целиком
+            или внешний шлюз.'
+          type: string
+          enum:
+          - OPERATION
+          - PROCESS
+          - SYSTEM
+          - GATEWAY
+        state:
+          description: FIRING — проблема активна; RESOLVED — проблема устранена (позволяет «Диво» автоматически
+            закрыть связанный инцидент и остановить SLA-таймер).
+          type: string
+          enum:
+          - FIRING
+          - RESOLVED
+        severity:
+          description: Критичность, рассчитанная адаптером по матрице «критичность ИТ-услуги × величина отклонения»
+            (docs/02-concept.md, раздел 5). «Диво» сопоставляет её с приоритетом инцидента.
+          type: string
+          enum:
+          - INFO
+          - WARNING
+          - MAJOR
+          - CRITICAL
+        occurredAt:
+          description: Когда проблема фактически возникла в Diasoft (ISO 8601 с часовым поясом). Используется для
+            расчёта SLA и упорядочивания событий.
+          type: string
+          format: date-time
+        detectedAt:
+          description: Когда адаптер обнаружил проблему. Разница detectedAt − occurredAt показывает задержку обнаружения
+            (MTTD).
+          type: string
+          format: date-time
+        sequence:
+          description: Монотонный номер события внутри correlationKey. «Диво» игнорирует устаревшие переходы состояния,
+            пришедшие не по порядку после повторной доставки.
+          type: integer
+          minimum: 1
+        correlationKey:
+          description: 'Ключ группировки однотипных событий в одно оповещение/инцидент: <serviceCode>:<eventType>[:<scope>].
+            Пример: TREASURY_FX_MM_SETTLEMENT:OPERATION_DELAYED.'
+          type: string
+          pattern: ^[A-Z0-9_]+:[A-Z0-9_]+(:[A-Za-z0-9_.-]+)?$
+          maxLength: 200
+        source:
+          description: Где возникло событие.
+          type: object
+          additionalProperties: false
+          required:
+          - system
+          - instance
+          - environment
+          properties:
+            system:
+              description: Код системы-источника в CMDB «Диво».
+              type: string
+              const: DIASOFT_FA_TREASURY_BACK
+            instance:
+              description: Экземпляр/узел (сервер приложений или схема БД). Нужен 2-й линии для диагностики.
+              type: string
+              maxLength: 64
+            module:
+              description: Модуль Treasury.Back, в котором возникла проблема.
+              type: string
+              enum:
+              - DEALS
+              - CONFIRMATIONS
+              - SETTLEMENT
+              - SECURITIES
+              - ACCOUNTING
+              - EOD
+              - MARKET_DATA
+              - REPORTING
+              - GATEWAYS
+              - PLATFORM
+            environment:
+              description: Контур. События не из PROD «Диво» не превращает в инциденты.
+              type: string
+              enum:
+              - PROD
+              - PREPROD
+              - TEST
+            adapterVersion:
+              description: Версия Integration Adapter — для разбора проблем самой интеграции.
+              type: string
+        service:
+          description: Какая ИТ-услуга из каталога «Диво» затронута. Это главная связка технического события с SLA.
+          type: object
+          additionalProperties: false
+          required:
+          - code
+          - ciId
+          properties:
+            code:
+              description: Код ИТ-услуги в каталоге «Диво».
+              type: string
+              enum:
+              - TREASURY_DEAL_CAPTURE
+              - TREASURY_FX_MM_SETTLEMENT
+              - TREASURY_SEC_SETTLEMENT
+              - TREASURY_EOD
+              - TREASURY_MARKET_DATA
+              - TREASURY_REPORTING
+            ciId:
+              description: Идентификатор конфигурационной единицы (КЕ) в CMDB «Диво», на которую регистрируется
+                инцидент.
+              type: string
+              pattern: ^CI-[A-Z0-9-]+$
+            name:
+              description: Человекочитаемое название услуги (для отображения без обращения к каталогу).
+              type: string
+        operation:
+          description: Данные затронутой операции (только для category = OPERATION). Без сумм, счетов и наименований
+            контрагентов.
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - type
+          - status
+          properties:
+            id:
+              description: Технический идентификатор операции/документа в Diasoft — по нему сопровождение находит
+                операцию.
+              type: string
+              maxLength: 64
+            type:
+              description: Тип казначейской операции.
+              type: string
+              enum:
+              - FX_SPOT
+              - FX_SWAP
+              - FX_FORWARD
+              - MM_DEPOSIT
+              - MM_LOAN
+              - REPO
+              - SECURITIES_TRADE
+              - DERIVATIVE
+            status:
+              description: Статус операции в Diasoft на момент события.
+              type: string
+              enum:
+              - NEW
+              - CONFIRMED
+              - PROCESSING
+              - SETTLED
+              - FAILED
+              - REJECTED
+              - CANCELLED
+            stage:
+              description: Этап жизненного цикла, на котором операция застряла.
+              type: string
+              enum:
+              - CAPTURE
+              - CONFIRMATION
+              - SETTLEMENT
+              - ACCOUNTING
+              - RECONCILIATION
+            valueDate:
+              description: 'Дата валютирования. Операция с валютированием «сегодня» критичнее: риск неисполнения
+                обязательств.'
+              type: string
+              format: date
+            currency:
+              description: Валюта (ISO 4217). Влияет на окно расчётов (cut-off).
+              type: string
+              pattern: ^[A-Z]{3}$
+            amountClass:
+              description: 'Класс суммы вместо самой суммы: позволяет учесть значимость, не раскрывая банковскую
+                тайну.'
+              type: string
+              enum:
+              - SMALL
+              - MEDIUM
+              - LARGE
+              - VERY_LARGE
+        metrics:
+          description: Количественные показатели отклонения. Нужны для правил корреляции, расчёта SLA и дашбордов
+            «Диво Мера».
+          type: object
+          additionalProperties: false
+          properties:
+            expectedDurationSec:
+              description: Норматив выполнения, сек.
+              type: integer
+              minimum: 0
+            actualDurationSec:
+              description: Фактическая длительность на момент события, сек.
+              type: integer
+              minimum: 0
+            deviationPct:
+              description: Превышение норматива, %.
+              type: number
+            affectedOperations:
+              description: Число затронутых операций (для агрегированных событий).
+              type: integer
+              minimum: 0
+            queueDepth:
+              description: Глубина очереди необработанных операций.
+              type: integer
+              minimum: 0
+            threshold:
+              description: Порог, при превышении которого сгенерировано событие.
+              type: number
+        sla:
+          description: Влияние на SLA ИТ-услуги.
+          type: object
+          additionalProperties: false
+          required:
+          - slaCode
+          - breached
+          properties:
+            slaCode:
+              description: Код SLA/OLA в «Диво».
+              type: string
+            deadline:
+              description: Крайний срок по SLA (например, cut-off расчётов).
+              type: string
+              format: date-time
+            breached:
+              description: Нарушен ли SLA на момент события.
+              type: boolean
+            timeToBreachSec:
+              description: Сколько осталось до нарушения SLA (если ещё не нарушен).
+              type: integer
+        message:
+          description: 'Краткое описание на русском языке для дежурного: станет темой оповещения/инцидента.'
+          type: string
+          minLength: 1
+          maxLength: 500
+        details:
+          description: Технические детали для 2-й линии.
+          type: object
+          additionalProperties: false
+          properties:
+            errorCode:
+              description: Код ошибки Diasoft / внешней системы.
+              type: string
+            errorText:
+              description: Текст ошибки (обезличенный).
+              type: string
+              maxLength: 2000
+            jobName:
+              description: Имя пакетного задания или шага закрытия дня.
+              type: string
+            gateway:
+              description: Внешний шлюз (для GATEWAY-событий).
+              type: string
+              enum:
+              - SWIFT
+              - CBR_PAYMENTS
+              - NSD
+              - MOEX
+              - SPFS
+            runbookUrl:
+              description: Ссылка на инструкцию для дежурной смены.
+              type: string
+              format: uri
+        tags:
+          description: Произвольные метки для фильтров «Диво» (не более 10).
+          type: array
+          items:
+            type: string
+            maxLength: 40
+          maxItems: 10
+          uniqueItems: true
+      allOf:
+      - if:
+          properties:
+            category:
+              const: OPERATION
+        then:
+          required:
+          - operation
+      - if:
+          properties:
+            eventType:
+              enum:
+              - OPERATION_DELAYED
+              - PROCESSING_BACKLOG
+              - EOD_CLOSE_DELAYED
+              - MARKET_DATA_STALE
+        then:
+          required:
+          - metrics
+    SubmitResult:
+      type: object
+      required:
+      - eventId
+      - status
+      - receivedAt
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - ACCEPTED
+          - DUPLICATE
+        receivedAt:
+          type: string
+          format: date-time
+        statusUrl:
+          type: string
+    BatchResult:
+      type: object
+      required:
+      - batchId
+      - accepted
+      - duplicates
+      - rejected
+      - results
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        accepted:
+          type: integer
+        duplicates:
+          type: integer
+        rejected:
+          type: integer
+        results:
+          type: array
+          items:
+            type: object
+            required:
+            - eventId
+            - httpStatus
+            - status
+            properties:
+              eventId:
+                type: string
+              httpStatus:
+                type: integer
+                description: Код
+                который вернул бы /events для этого элемента: null
+              status:
+                type: string
+                enum:
+                - ACCEPTED
+                - DUPLICATE
+                - REJECTED
+                - RETRY
+              error:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  message:
+                    type: string
+                  field:
+                    type: string
+    EventStatus:
+      type: object
+      required:
+      - eventId
+      - processingStatus
+      - receivedAt
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        processingStatus:
+          type: string
+          description: 'RECEIVED — сохранено, ждёт обработки;
+
+            CORRELATED — добавлено в существующее оповещение;
+
+            INCIDENT_CREATED — создан новый инцидент;
+
+            INCIDENT_UPDATED — обновлён/закрыт существующий инцидент (в т.ч. по RESOLVED);
+
+            SUPPRESSED — подавлено (плановые работы, не-PROD, ниже порога);
+
+            REJECTED — отклонено при обработке.
+
+            '
+          enum:
+          - RECEIVED
+          - CORRELATED
+          - INCIDENT_CREATED
+          - INCIDENT_UPDATED
+          - SUPPRESSED
+          - REJECTED
+        receivedAt:
+          type: string
+          format: date-time
+        processedAt:
+          type: string
+          format: date-time
+        suppressionReason:
+          type: string
+          enum:
+          - MAINTENANCE_WINDOW
+          - NON_PROD
+          - BELOW_THRESHOLD
+          - STALE_SEQUENCE
+        correlation:
+          type: object
+          properties:
+            correlationKey:
+              type: string
+            alertId:
+              type: string
+            eventsInAlert:
+              type: integer
+        incident:
+          type: object
+          properties:
+            id:
+              type: string
+              examples:
+              - INC-18493
+            priority:
+              type: string
+              enum:
+              - P1
+              - P2
+              - P3
+              - P4
+            status:
+              type: string
+              enum:
+              - NEW
+              - IN_PROGRESS
+              - ON_HOLD
+              - RESOLVED
+              - CLOSED
+            assignmentGroup:
+              type: string
+            url:
+              type: string
+              format: uri
+    MetricsSnapshot:
+      type: object
+      required:
+      - snapshotId
+      - periodStart
+      - periodEnd
+      - source
+      - services
+      properties:
+        snapshotId:
+          type: string
+          format: uuid
+        periodStart:
+          type: string
+          format: date-time
+        periodEnd:
+          type: string
+          format: date-time
+        source:
+          type: object
+          required:
+          - system
+          - environment
+          properties:
+            system:
+              type: string
+              const: DIASOFT_FA_TREASURY_BACK
+            environment:
+              type: string
+              enum:
+              - PROD
+              - PREPROD
+              - TEST
+        services:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - serviceCode
+            - operationsProcessed
+            - operationsInTimePct
+            properties:
+              serviceCode:
+                type: string
+              operationsProcessed:
+                type: integer
+                minimum: 0
+                description: Обработано операций за период
+              operationsInTimePct:
+                type: number
+                minimum: 0
+                maximum: 100
+                description: Доля операций
+                уложившихся в норматив — основа SLA-отчётности: null
+              p95DurationSec:
+                type: integer
+                minimum: 0
+              queueDepth:
+                type: integer
+                minimum: 0
+              errors:
+                type: integer
+                minimum: 0
+    Heartbeat:
+      type: object
+      required:
+      - adapterId
+      - sentAt
+      - intervalSec
+      - source
+      - outbox
+      properties:
+        adapterId:
+          type: string
+        adapterVersion:
+          type: string
+        sentAt:
+          type: string
+          format: date-time
+        intervalSec:
+          type: integer
+          minimum: 10
+        source:
+          type: object
+          required:
+          - system
+          - reachable
+          properties:
+            system:
+              type: string
+            reachable:
+              type: boolean
+              description: Отвечает ли Diasoft на проверки адаптера
+            lastSuccessfulPollAt:
+              type: string
+              format: date-time
+        outbox:
+          type: object
+          required:
+          - pending
+          - deadLetter
+          properties:
+            pending:
+              type: integer
+              minimum: 0
+              description: Событий ждут отправки
+            oldestPendingAgeSec:
+              type: integer
+              minimum: 0
+            deadLetter:
+              type: integer
+              minimum: 0
+              description: Событий в DLQ
+              требуют разбора: null
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details
+      required:
+      - title
+      - status
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+        detail:
+          type: string
+        traceId:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string

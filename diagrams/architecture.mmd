@@ -1,0 +1,54 @@
+%%{init: {"flowchart": {"defaultRenderer": "elk"}}}%%
+flowchart TB
+    subgraph DS["① Diasoft FA#35; Treasury.Back — не дорабатывается"]
+        direction LR
+        APP["Серверы приложений<br/>сделки · расчёты · учёт"]
+        DB[("БД: журнал операций,<br/>статусы, планировщик")]
+        REP[("Read-only<br/>реплика БД")]
+        APP --- DB -. репликация .-> REP
+    end
+
+    subgraph AD["② Integration Adapter · Treasury Event Gateway"]
+        direction LR
+        SC["Source Connectors<br/>опрос реплики 30 с ·<br/>health-probe 20 с ·<br/>задания закрытия дня"]
+        RE["Rules Engine<br/>нормативы · SLA-календари ·<br/>матрица severity ·<br/>каталог услуг"]
+        OB[("Transactional<br/>Outbox")]
+        DW["Delivery Worker<br/>retry + backoff ·<br/>circuit breaker"]
+        HB["Heartbeat 60 с ·<br/>метрики 5 мин"]
+        DLQ[("Dead Letter<br/>Queue")]
+        SC --> RE --> OB --> DW
+        HB --> DW
+        DW -. "4xx / попытки исчерпаны" .-> DLQ
+    end
+
+    GW["③ Корпоративный API Gateway · mTLS · OAuth2 · лимиты · аудит"]
+
+    subgraph DV["④ ESM-платформа «Диво»"]
+        direction LR
+        API["Integration API<br/>/events · /metrics ·<br/>/heartbeat"]
+        CR["Корреляция<br/>дедупликация · группировка ·<br/>плановые работы"]
+        INC["«Диво Сервис»<br/>инциденты ·<br/>SLA-таймеры"]
+        MERA["«Диво Мера»<br/>дашборды ·<br/>SLA-отчёты"]
+        PORT["«Диво Портал»<br/>виджет статуса"]
+        CMDB[("Каталог услуг<br/>и CMDB")]
+        API --> CR --> INC --> MERA
+        INC --> PORT
+        CMDB --- CR
+    end
+
+    MON["Корпоративный мониторинг: алерты по DLQ и самой интеграции"]
+
+    REP -- "SQL read-only" --> SC
+    APP -- "HTTP health-check" --> SC
+    DW == "HTTPS · REST/JSON · push" ==> GW == HTTPS ==> API
+    CMDB -. "справочники услуг и КЕ, 1 раз/сутки" .-> RE
+    DLQ -. алерт .-> MON
+
+    classDef ds fill:#F4F4F2,stroke:#5C5B57,color:#0B0B0B
+    classDef ad fill:#FFFFFF,stroke:#0B0B0B,stroke-width:2px,color:#0B0B0B
+    classDef dv fill:#E7EEFF,stroke:#2B73FE,color:#0B0B0B
+    classDef ext fill:#FFFFFF,stroke:#D5D8DE,color:#0B0B0B
+    class APP,DB,REP ds
+    class SC,RE,OB,DW,DLQ,HB ad
+    class API,CR,INC,CMDB,MERA,PORT dv
+    class GW,MON ext

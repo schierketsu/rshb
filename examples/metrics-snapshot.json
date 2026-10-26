@@ -1,0 +1,35 @@
+{
+  "snapshotId": "0192f1a9-0000-7000-8000-000000000042",
+  "periodStart": "2026-10-26T11:40:00+03:00",
+  "periodEnd": "2026-10-26T11:45:00+03:00",
+  "source": {
+    "system": "DIASOFT_FA_TREASURY_BACK",
+    "environment": "PROD"
+  },
+  "services": [
+    {
+      "serviceCode": "TREASURY_FX_MM_SETTLEMENT",
+      "operationsProcessed": 184,
+      "operationsInTimePct": 96.7,
+      "p95DurationSec": 212,
+      "queueDepth": 7,
+      "errors": 1
+    },
+    {
+      "serviceCode": "TREASURY_SEC_SETTLEMENT",
+      "operationsProcessed": 63,
+      "operationsInTimePct": 100.0,
+      "p95DurationSec": 95,
+      "queueDepth": 0,
+      "errors": 0
+    },
+    {
+      "serviceCode": "TREASURY_DEAL_CAPTURE",
+      "operationsProcessed": 241,
+      "operationsInTimePct": 99.6,
+      "p95DurationSec": 18,
+      "queueDepth": 2,
+      "errors": 0
+    }
+  ]
+}

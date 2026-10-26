@@ -1,0 +1,29 @@
+{
+  "specVersion": "1.0",
+  "eventId": "0192f1a6-3d40-7e9a-b1c2-7f8e9d0a1b22",
+  "eventType": "SYSTEM_UNAVAILABLE",
+  "category": "SYSTEM",
+  "state": "FIRING",
+  "severity": "CRITICAL",
+  "occurredAt": "2026-10-26T13:15:02+03:00",
+  "detectedAt": "2026-10-26T13:16:02+03:00",
+  "sequence": 1,
+  "correlationKey": "TREASURY_DEAL_CAPTURE:SYSTEM_UNAVAILABLE",
+  "source": {
+    "system": "DIASOFT_FA_TREASURY_BACK",
+    "instance": "tb-app-prod-01",
+    "module": "PLATFORM",
+    "environment": "PROD",
+    "adapterVersion": "1.4.0"
+  },
+  "service": {
+    "code": "TREASURY_DEAL_CAPTURE",
+    "ciId": "CI-TB-CORE-01",
+    "name": "Учёт сделок казначейства"
+  },
+  "message": "Сервер приложений Diasoft FA# Treasury.Back не отвечает на проверки доступности 3 раза подряд (60 с)",
+  "details": {
+    "errorCode": "ADAPTER-PROBE-TIMEOUT",
+    "errorText": "Health-probe timeout 20s x3"
+  }
+}

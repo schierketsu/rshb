@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    participant TB as Diasoft FA#35;<br/>Treasury.Back
+    participant AD as Integration Adapter
+    participant DV as «Диво»
+
+    rect rgb(252, 228, 231)
+    Note over TB,DV: Сценарий Г — недоступен сам Diasoft
+    AD->>TB: health-probe (каждые 20 с)
+    TB--xAD: таймаут
+    AD->>TB: health-probe
+    TB--xAD: таймаут
+    AD->>TB: health-probe
+    TB--xAD: таймаут
+    AD->>DV: POST /events SYSTEM_UNAVAILABLE · CRITICAL
+    Note over DV: инцидент P1 на КЕ CI-TB-CORE-01,<br/>подавление производных событий (одна авария — один инцидент)
+    TB-->>AD: health-probe OK
+    AD->>DV: POST /events SYSTEM_UNAVAILABLE · RESOLVED
+    end
+
+    rect rgb(231, 238, 255)
+    Note over AD,DV: Сценарий Д — упал сам адаптер («dead man's switch»)
+    loop каждые 60 с
+        AD->>DV: POST /heartbeat {source.reachable, outbox.pending}
+        DV-->>AD: 204
+    end
+    Note over AD: адаптер остановился
+    Note over DV: нет heartbeat 3 мин ⇒ событие INTEGRATION_HEARTBEAT_LOST,<br/>статус услуг казначейства = «Нет данных», а не «Норма»
+    end

@@ -1,0 +1,35 @@
+sequenceDiagram
+    autonumber
+    participant TB as Diasoft FA#35;<br/>Treasury.Back
+    participant AD as Integration<br/>Adapter
+    participant OB as Outbox<br/>(PostgreSQL)
+    participant GW as API Gateway
+    participant DV as «Диво» Integration API
+    participant CR as Корреляция<br/>и правила
+    participant SV as «Диво Сервис»<br/>(инциденты, SLA)
+
+    Note over TB: 11:30 сделка FX-834724<br/>в статусе PROCESSING
+    loop каждые 30 с
+        AD->>TB: SELECT операции в работе (read-only реплика)
+        TB-->>AD: статусы, время начала этапа
+    end
+    Note over AD: 22 мин > норматив 5 мин ⇒ OPERATION_DELAYED<br/>severity = MAJOR (услуга кр.1 × валютирование сегодня)
+    AD->>OB: INSERT событие (eventId = UUID v7) в той же транзакции,<br/>что и фиксация «уже сообщали»
+    OB-->>AD: commit
+    AD->>GW: POST /events · Idempotency-Key: eventId · mTLS + OAuth2
+    GW->>DV: проксирование, проверка токена и лимитов
+    Note over DV: валидация по JSON Schema, проверка КЕ в CMDB
+    DV-->>AD: 202 Accepted {status: ACCEPTED}
+    AD->>OB: отметить событие доставленным
+    DV->>CR: событие в обработку (асинхронно)
+    Note over CR: correlationKey = TREASURY_FX_MM_SETTLEMENT:OPERATION_DELAYED<br/>6 событий за 10 мин ⇒ порог инцидента достигнут
+    CR->>SV: создать инцидент P2 на КЕ CI-TB-SETTL-01
+    Note over SV: запуск SLA-таймера, назначение группы<br/>«Сопровождение Diasoft Treasury», оповещение дежурного
+    Note over TB: 11:58 расчёт завершён (SETTLED)
+    AD->>TB: очередной опрос
+    TB-->>AD: статус SETTLED
+    AD->>DV: POST /events {state: RESOLVED, sequence: 2}
+    DV-->>AD: 202 Accepted
+    DV->>CR: RESOLVED по тому же correlationKey
+    CR->>SV: все события оповещения закрыты ⇒ инцидент → RESOLVED
+    Note over SV: остановка SLA-таймера, фиксация длительности для отчёта

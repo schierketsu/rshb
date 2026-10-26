@@ -1,0 +1,41 @@
+{
+  "specVersion": "1.0",
+  "eventId": "0192f1a2-1f80-7d55-8b9e-5a2d4c6e7f01",
+  "eventType": "EOD_CLOSE_DELAYED",
+  "category": "PROCESS",
+  "state": "FIRING",
+  "severity": "CRITICAL",
+  "occurredAt": "2026-10-26T19:10:00+03:00",
+  "detectedAt": "2026-10-26T19:30:00+03:00",
+  "sequence": 3,
+  "correlationKey": "TREASURY_EOD:EOD_CLOSE_DELAYED:2026-10-26",
+  "source": {
+    "system": "DIASOFT_FA_TREASURY_BACK",
+    "instance": "tb-batch-prod-01",
+    "module": "EOD",
+    "environment": "PROD",
+    "adapterVersion": "1.4.0"
+  },
+  "service": {
+    "code": "TREASURY_EOD",
+    "ciId": "CI-TB-EOD-01",
+    "name": "Закрытие операционного дня казначейства"
+  },
+  "metrics": {
+    "expectedDurationSec": 600,
+    "actualDurationSec": 1200,
+    "deviationPct": 100.0,
+    "threshold": 600
+  },
+  "sla": {
+    "slaCode": "SLA-TRS-EOD",
+    "deadline": "2026-10-26T20:00:00+03:00",
+    "breached": false,
+    "timeToBreachSec": 1800
+  },
+  "message": "Закрытие операционного дня казначейства идёт 20 мин при нормативе 10 мин, до дедлайна SLA 30 мин: шаг «Переоценка позиций» не завершён",
+  "details": {
+    "jobName": "EOD_STEP_07_REVALUATION",
+    "runbookUrl": "https://wiki.rshb.local/runbooks/treasury/eod"
+  }
+}

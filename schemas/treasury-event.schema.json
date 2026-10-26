@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://divo.rshb.local/schemas/treasury-event/1.0.json",
+  "title": "TreasuryEvent",
+  "description": "Событие мониторинга казначейского ИТ-сервиса, передаваемое из Diasoft FA# Treasury.Back (через Integration Adapter) в ESM-платформу «Диво». Банковская тайна и персональные данные не передаются: только технические идентификаторы, статусы и метрики.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "specVersion",
+    "eventId",
+    "eventType",
+    "category",
+    "state",
+    "severity",
+    "occurredAt",
+    "detectedAt",
+    "correlationKey",
+    "source",
+    "service",
+    "message"
+  ],
+  "properties": {
+    "specVersion": {
+      "description": "Версия контракта. Позволяет «Диво» обрабатывать старые и новые версии событий параллельно.",
+      "type": "string",
+      "const": "1.0"
+    },
+    "eventId": {
+      "description": "Глобально уникальный идентификатор события (UUID v7, упорядочен по времени). Ключ идемпотентности: повторная доставка с тем же eventId не создаёт дубль.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "description": "Тип события из каталога событий интеграции (docs/02-concept.md).",
+      "type": "string",
+      "enum": [
+        "OPERATION_DELAYED",
+        "OPERATION_FAILED",
+        "SETTLEMENT_REJECTED",
+        "PROCESSING_BACKLOG",
+        "EOD_CLOSE_DELAYED",
+        "EOD_STEP_FAILED",
+        "MARKET_DATA_STALE",
+        "EXTERNAL_GATEWAY_ERROR",
+        "BATCH_JOB_FAILED",
+        "SYSTEM_UNAVAILABLE",
+        "SYSTEM_DEGRADED"
+      ]
+    },
+    "category": {
+      "description": "Уровень, на котором возникла проблема: отдельная операция, бизнес-процесс, система целиком или внешний шлюз.",
+      "type": "string",
+      "enum": ["OPERATION", "PROCESS", "SYSTEM", "GATEWAY"]
+    },
+    "state": {
+      "description": "FIRING — проблема активна; RESOLVED — проблема устранена (позволяет «Диво» автоматически закрыть связанный инцидент и остановить SLA-таймер).",
+      "type": "string",
+      "enum": ["FIRING", "RESOLVED"]
+    },
+    "severity": {
+      "description": "Критичность, рассчитанная адаптером по матрице «критичность ИТ-услуги × величина отклонения» (docs/02-concept.md, раздел 5). «Диво» сопоставляет её с приоритетом инцидента.",
+      "type": "string",
+      "enum": ["INFO", "WARNING", "MAJOR", "CRITICAL"]
+    },
+    "occurredAt": {
+      "description": "Когда проблема фактически возникла в Diasoft (ISO 8601 с часовым поясом). Используется для расчёта SLA и упорядочивания событий.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "detectedAt": {
+      "description": "Когда адаптер обнаружил проблему. Разница detectedAt − occurredAt показывает задержку обнаружения (MTTD).",
+      "type": "string",
+      "format": "date-time"
+    },
+    "sequence": {
+      "description": "Монотонный номер события внутри correlationKey. «Диво» игнорирует устаревшие переходы состояния, пришедшие не по порядку после повторной доставки.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "correlationKey": {
+      "description": "Ключ группировки однотипных событий в одно оповещение/инцидент: <serviceCode>:<eventType>[:<scope>]. Пример: TREASURY_FX_MM_SETTLEMENT:OPERATION_DELAYED.",
+      "type": "string",
+      "pattern": "^[A-Z0-9_]+:[A-Z0-9_]+(:[A-Za-z0-9_.-]+)?$",
+      "maxLength": 200
+    },
+    "source": {
+      "description": "Где возникло событие.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system", "instance", "environment"],
+      "properties": {
+        "system": {
+          "description": "Код системы-источника в CMDB «Диво».",
+          "type": "string",
+          "const": "DIASOFT_FA_TREASURY_BACK"
+        },
+        "instance": {
+          "description": "Экземпляр/узел (сервер приложений или схема БД). Нужен 2-й линии для диагностики.",
+          "type": "string",
+          "maxLength": 64
+        },
+        "module": {
+          "description": "Модуль Treasury.Back, в котором возникла проблема.",
+          "type": "string",
+          "enum": ["DEALS", "CONFIRMATIONS", "SETTLEMENT", "SECURITIES", "ACCOUNTING", "EOD", "MARKET_DATA", "REPORTING", "GATEWAYS", "PLATFORM"]
+        },
+        "environment": {
+          "description": "Контур. События не из PROD «Диво» не превращает в инциденты.",
+          "type": "string",
+          "enum": ["PROD", "PREPROD", "TEST"]
+        },
+        "adapterVersion": {
+          "description": "Версия Integration Adapter — для разбора проблем самой интеграции.",
+          "type": "string"
+        }
+      }
+    },
+    "service": {
+      "description": "Какая ИТ-услуга из каталога «Диво» затронута. Это главная связка технического события с SLA.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "ciId"],
+      "properties": {
+        "code": {
+          "description": "Код ИТ-услуги в каталоге «Диво».",
+          "type": "string",
+          "enum": [
+            "TREASURY_DEAL_CAPTURE",
+            "TREASURY_FX_MM_SETTLEMENT",
+            "TREASURY_SEC_SETTLEMENT",
+            "TREASURY_EOD",
+            "TREASURY_MARKET_DATA",
+            "TREASURY_REPORTING"
+          ]
+        },
+        "ciId": {
+          "description": "Идентификатор конфигурационной единицы (КЕ) в CMDB «Диво», на которую регистрируется инцидент.",
+          "type": "string",
+          "pattern": "^CI-[A-Z0-9-]+$"
+        },
+        "name": {
+          "description": "Человекочитаемое название услуги (для отображения без обращения к каталогу).",
+          "type": "string"
+        }
+      }
+    },
+    "operation": {
+      "description": "Данные затронутой операции (только для category = OPERATION). Без сумм, счетов и наименований контрагентов.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "status"],
+      "properties": {
+        "id": {
+          "description": "Технический идентификатор операции/документа в Diasoft — по нему сопровождение находит операцию.",
+          "type": "string",
+          "maxLength": 64
+        },
+        "type": {
+          "description": "Тип казначейской операции.",
+          "type": "string",
+          "enum": ["FX_SPOT", "FX_SWAP", "FX_FORWARD", "MM_DEPOSIT", "MM_LOAN", "REPO", "SECURITIES_TRADE", "DERIVATIVE"]
+        },
+        "status": {
+          "description": "Статус операции в Diasoft на момент события.",
+          "type": "string",
+          "enum": ["NEW", "CONFIRMED", "PROCESSING", "SETTLED", "FAILED", "REJECTED", "CANCELLED"]
+        },
+        "stage": {
+          "description": "Этап жизненного цикла, на котором операция застряла.",
+          "type": "string",
+          "enum": ["CAPTURE", "CONFIRMATION", "SETTLEMENT", "ACCOUNTING", "RECONCILIATION"]
+        },
+        "valueDate": {
+          "description": "Дата валютирования. Операция с валютированием «сегодня» критичнее: риск неисполнения обязательств.",
+          "type": "string",
+          "format": "date"
+        },
+        "currency": {
+          "description": "Валюта (ISO 4217). Влияет на окно расчётов (cut-off).",
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "amountClass": {
+          "description": "Класс суммы вместо самой суммы: позволяет учесть значимость, не раскрывая банковскую тайну.",
+          "type": "string",
+          "enum": ["SMALL", "MEDIUM", "LARGE", "VERY_LARGE"]
+        }
+      }
+    },
+    "metrics": {
+      "description": "Количественные показатели отклонения. Нужны для правил корреляции, расчёта SLA и дашбордов «Диво Мера».",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expectedDurationSec": { "description": "Норматив выполнения, сек.", "type": "integer", "minimum": 0 },
+        "actualDurationSec": { "description": "Фактическая длительность на момент события, сек.", "type": "integer", "minimum": 0 },
+        "deviationPct": { "description": "Превышение норматива, %.", "type": "number" },
+        "affectedOperations": { "description": "Число затронутых операций (для агрегированных событий).", "type": "integer", "minimum": 0 },
+        "queueDepth": { "description": "Глубина очереди необработанных операций.", "type": "integer", "minimum": 0 },
+        "threshold": { "description": "Порог, при превышении которого сгенерировано событие.", "type": "number" }
+      }
+    },
+    "sla": {
+      "description": "Влияние на SLA ИТ-услуги.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slaCode", "breached"],
+      "properties": {
+        "slaCode": { "description": "Код SLA/OLA в «Диво».", "type": "string" },
+        "deadline": { "description": "Крайний срок по SLA (например, cut-off расчётов).", "type": "string", "format": "date-time" },
+        "breached": { "description": "Нарушен ли SLA на момент события.", "type": "boolean" },
+        "timeToBreachSec": { "description": "Сколько осталось до нарушения SLA (если ещё не нарушен).", "type": "integer" }
+      }
+    },
+    "message": {
+      "description": "Краткое описание на русском языке для дежурного: станет темой оповещения/инцидента.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "details": {
+      "description": "Технические детали для 2-й линии.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "errorCode": { "description": "Код ошибки Diasoft / внешней системы.", "type": "string" },
+        "errorText": { "description": "Текст ошибки (обезличенный).", "type": "string", "maxLength": 2000 },
+        "jobName": { "description": "Имя пакетного задания или шага закрытия дня.", "type": "string" },
+        "gateway": { "description": "Внешний шлюз (для GATEWAY-событий).", "type": "string", "enum": ["SWIFT", "CBR_PAYMENTS", "NSD", "MOEX", "SPFS"] },
+        "runbookUrl": { "description": "Ссылка на инструкцию для дежурной смены.", "type": "string", "format": "uri" }
+      }
+    },
+    "tags": {
+      "description": "Произвольные метки для фильтров «Диво» (не более 10).",
+      "type": "array",
+      "items": { "type": "string", "maxLength": 40 },
+      "maxItems": 10,
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "category": { "const": "OPERATION" } } },
+      "then": { "required": ["operation"] }
+    },
+    {
+      "if": { "properties": { "eventType": { "enum": ["OPERATION_DELAYED", "PROCESSING_BACKLOG", "EOD_CLOSE_DELAYED", "MARKET_DATA_STALE"] } } },
+      "then": { "required": ["metrics"] }
+    }
+  ]
+}

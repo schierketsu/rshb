@@ -1,0 +1,459 @@
+openapi: 3.1.0
+info:
+  title: Divo Treasury Integration API
+  version: 1.0.0
+  summary: Приём событий мониторинга из Diasoft FA# Treasury.Back в ESM-платформу «Диво»
+  description: |
+    API публикуется интеграционным слоем «Диво Сервис» и вызывается Integration Adapter
+    (Treasury Event Gateway), который стоит между Diasoft FA# Treasury.Back и «Диво».
+
+    Принципы:
+    * **Push по событию** для критичных событий (`/events`), **пакетом по расписанию** для
+      агрегированных метрик (`/metrics`), **heartbeat** раз в 60 с (`/heartbeat`).
+    * **Идемпотентность**: ключ — `eventId` (он же заголовок `Idempotency-Key`). Повторная доставка
+      возвращает `200 DUPLICATE` и не создаёт второй инцидент.
+    * **Асинхронная обработка**: `202 Accepted` означает «событие надёжно сохранено»,
+      корреляция и создание инцидента идут дальше; результат — `GET /events/{eventId}`.
+    * Ошибки — в формате RFC 9457 (`application/problem+json`).
+    * Банковская тайна и персональные данные не передаются.
+  contact:
+    name: Команда интеграции казначейского блока
+servers:
+  - url: https://api-gw.rshb.local/divo/api/v1/integrations/treasury
+    description: PROD (через корпоративный API Gateway)
+  - url: https://api-gw-test.rshb.local/divo/api/v1/integrations/treasury
+    description: TEST
+security:
+  - mtls: []
+    oauth2: [treasury.events.write]
+tags:
+  - name: Events
+    description: События мониторинга
+  - name: Metrics
+    description: Периодические метрики качества ИТ-услуг
+  - name: Health
+    description: Контроль живости самой интеграции
+
+paths:
+  /events:
+    post:
+      tags: [Events]
+      operationId: submitEvent
+      summary: Передать одно событие
+      description: |
+        Основной канал. Адаптер вызывает метод сразу после обнаружения проблемы (push).
+        «Диво» синхронно валидирует событие, сохраняет его и отвечает `202`; корреляция
+        и создание инцидента выполняются асинхронно (обычно < 2 с).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/treasury-event.schema.json'
+            examples:
+              operationDelayed:
+                summary: Задержка расчёта по сделке FX
+                externalValue: ../examples/event-operation-delayed.json
+              resolved:
+                summary: Задержка устранена (RESOLVED)
+                externalValue: ../examples/event-operation-delayed-resolved.json
+      responses:
+        '202':
+          description: Событие принято и надёжно сохранено, обработка асинхронная
+          headers:
+            Location:
+              description: URL статуса обработки
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmitResult' }
+              example:
+                eventId: 0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+                status: ACCEPTED
+                receivedAt: '2026-10-26T11:47:22.105+03:00'
+                statusUrl: /api/v1/integrations/treasury/events/0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+        '200':
+          description: Событие с таким eventId уже принято ранее (идемпотентный повтор). Повторно не обрабатывается.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmitResult' }
+              example:
+                eventId: 0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+                status: DUPLICATE
+                receivedAt: '2026-10-26T11:47:22.105+03:00'
+                statusUrl: /api/v1/integrations/treasury/events/0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /events/batch:
+    post:
+      tags: [Events]
+      operationId: submitEventsBatch
+      summary: Передать пакет событий (до 500)
+      description: |
+        Используется для **досылки накопленных событий** после восстановления «Диво»
+        (разбор outbox) и при пиковой нагрузке (закрытие дня). Каждое событие
+        обрабатывается независимо, результат — по каждому элементу (`207 Multi-Status`).
+        Адаптер повторяет только элементы с кодами 429/5xx.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [batchId, events]
+              properties:
+                batchId:
+                  type: string
+                  format: uuid
+                  description: Идентификатор пакета (для журналов и трассировки)
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  description: События, упорядоченные по occurredAt
+                  items:
+                    $ref: '../schemas/treasury-event.schema.json'
+            examples:
+              batch:
+                externalValue: ../examples/batch-request.json
+      responses:
+        '207':
+          description: Пакет обработан, результат по каждому событию
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchResult' }
+              examples:
+                partial:
+                  externalValue: ../examples/response-207-batch.json
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /events/{eventId}:
+    get:
+      tags: [Events]
+      operationId: getEventStatus
+      summary: Статус обработки события
+      description: |
+        Позволяет адаптеру (и сопровождению) проверить, чем закончилась обработка:
+        событие сгруппировано в оповещение, создан инцидент, подавлено (плановые работы)
+        или отклонено. Используется для сверки после сбоев доставки.
+      security:
+        - mtls: []
+          oauth2: [treasury.events.read]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Статус найден
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventStatus' }
+              examples:
+                incidentCreated:
+                  externalValue: ../examples/response-event-status.json
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Событие с таким eventId не поступало (адаптер должен отправить его повторно)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /metrics:
+    post:
+      tags: [Metrics]
+      operationId: submitMetricsSnapshot
+      summary: Передать агрегированные метрики за период (раз в 5 минут)
+      description: |
+        Режим «по расписанию». Не создаёт инцидентов напрямую — питает дашборды
+        «Диво Мера», расчёт доступности/SLA и тренды (раннее обнаружение деградации).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MetricsSnapshot' }
+            examples:
+              snapshot:
+                externalValue: ../examples/metrics-snapshot.json
+      responses:
+        '202':
+          description: Снимок метрик принят
+        '200':
+          description: Снимок с таким snapshotId уже принят (идемпотентный повтор)
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /heartbeat:
+    post:
+      tags: [Health]
+      operationId: sendHeartbeat
+      summary: Сигнал живости адаптера (раз в 60 с)
+      description: |
+        «Dead man's switch»: если «Диво» не получает heartbeat дольше 3 интервалов,
+        оно само регистрирует событие `INTEGRATION_HEARTBEAT_LOST`. Так обнаруживается
+        ситуация, когда упал сам адаптер и событий нет не потому, что всё хорошо.
+        В теле — состояние источника и очереди адаптера (растущий outbox = проблема доставки).
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Heartbeat' }
+            examples:
+              ok:
+                externalValue: ../examples/heartbeat.json
+      responses:
+        '204':
+          description: Heartbeat принят
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+components:
+  securitySchemes:
+    mtls:
+      type: mutualTLS
+      description: Взаимная TLS-аутентификация по сертификату адаптера, выпущенному УЦ банка
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://sso.rshb.local/oauth2/token
+          scopes:
+            treasury.events.write: Передача событий, метрик и heartbeat
+            treasury.events.read: Чтение статусов обработки
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Совпадает с eventId (для /metrics — со snapshotId). Повтор с тем же ключом и тем же телом → 200; с другим телом → 409.
+      schema: { type: string, format: uuid }
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: Идентификатор запроса для сквозной трассировки (адаптер → API Gateway → «Диво»)
+      schema: { type: string, maxLength: 64 }
+
+  responses:
+    BadRequest:
+      description: Некорректный JSON или нарушена структура запроса. Повтор бессмысленен → DLQ.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Нет/истёк токен или недействителен клиентский сертификат. Адаптер обновляет токен и повторяет.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: У клиента нет прав (scope) или источник не зарегистрирован. Повтор бессмысленен → DLQ + оповещение.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    IdempotencyConflict:
+      description: eventId уже использован с другим содержимым — ошибка адаптера. → DLQ.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PayloadTooLarge:
+      description: Превышен размер запроса (событие > 64 КБ или пакет > 500 событий). Адаптер дробит пакет.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ValidationError:
+      description: JSON корректен, но не соответствует схеме или каталогу (неизвестная ИТ-услуга/КЕ). Повтор бессмысленен → DLQ.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            validation:
+              externalValue: ../examples/response-422-error.json
+    TooManyRequests:
+      description: Превышен лимит запросов. Адаптер ждёт Retry-After и повторяет.
+      headers:
+        Retry-After:
+          description: Через сколько секунд повторить
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ServiceUnavailable:
+      description: «Диво» временно недоступно. Событие остаётся в outbox адаптера, повтор с экспоненциальной задержкой.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    SubmitResult:
+      type: object
+      required: [eventId, status, receivedAt]
+      properties:
+        eventId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [ACCEPTED, DUPLICATE]
+        receivedAt: { type: string, format: date-time }
+        statusUrl: { type: string }
+
+    BatchResult:
+      type: object
+      required: [batchId, accepted, duplicates, rejected, results]
+      properties:
+        batchId: { type: string, format: uuid }
+        accepted: { type: integer }
+        duplicates: { type: integer }
+        rejected: { type: integer }
+        results:
+          type: array
+          items:
+            type: object
+            required: [eventId, httpStatus, status]
+            properties:
+              eventId: { type: string }
+              httpStatus: { type: integer, description: Код, который вернул бы /events для этого элемента }
+              status: { type: string, enum: [ACCEPTED, DUPLICATE, REJECTED, RETRY] }
+              error:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  field: { type: string }
+
+    EventStatus:
+      type: object
+      required: [eventId, processingStatus, receivedAt]
+      properties:
+        eventId: { type: string, format: uuid }
+        processingStatus:
+          type: string
+          description: |
+            RECEIVED — сохранено, ждёт обработки;
+            CORRELATED — добавлено в существующее оповещение;
+            INCIDENT_CREATED — создан новый инцидент;
+            INCIDENT_UPDATED — обновлён/закрыт существующий инцидент (в т.ч. по RESOLVED);
+            SUPPRESSED — подавлено (плановые работы, не-PROD, ниже порога);
+            REJECTED — отклонено при обработке.
+          enum: [RECEIVED, CORRELATED, INCIDENT_CREATED, INCIDENT_UPDATED, SUPPRESSED, REJECTED]
+        receivedAt: { type: string, format: date-time }
+        processedAt: { type: string, format: date-time }
+        suppressionReason:
+          type: string
+          enum: [MAINTENANCE_WINDOW, NON_PROD, BELOW_THRESHOLD, STALE_SEQUENCE]
+        correlation:
+          type: object
+          properties:
+            correlationKey: { type: string }
+            alertId: { type: string }
+            eventsInAlert: { type: integer }
+        incident:
+          type: object
+          properties:
+            id: { type: string, examples: [INC-18493] }
+            priority: { type: string, enum: [P1, P2, P3, P4] }
+            status: { type: string, enum: [NEW, IN_PROGRESS, ON_HOLD, RESOLVED, CLOSED] }
+            assignmentGroup: { type: string }
+            url: { type: string, format: uri }
+
+    MetricsSnapshot:
+      type: object
+      required: [snapshotId, periodStart, periodEnd, source, services]
+      properties:
+        snapshotId: { type: string, format: uuid }
+        periodStart: { type: string, format: date-time }
+        periodEnd: { type: string, format: date-time }
+        source:
+          type: object
+          required: [system, environment]
+          properties:
+            system: { type: string, const: DIASOFT_FA_TREASURY_BACK }
+            environment: { type: string, enum: [PROD, PREPROD, TEST] }
+        services:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [serviceCode, operationsProcessed, operationsInTimePct]
+            properties:
+              serviceCode: { type: string }
+              operationsProcessed: { type: integer, minimum: 0, description: Обработано операций за период }
+              operationsInTimePct: { type: number, minimum: 0, maximum: 100, description: Доля операций, уложившихся в норматив — основа SLA-отчётности }
+              p95DurationSec: { type: integer, minimum: 0 }
+              queueDepth: { type: integer, minimum: 0 }
+              errors: { type: integer, minimum: 0 }
+
+    Heartbeat:
+      type: object
+      required: [adapterId, sentAt, intervalSec, source, outbox]
+      properties:
+        adapterId: { type: string }
+        adapterVersion: { type: string }
+        sentAt: { type: string, format: date-time }
+        intervalSec: { type: integer, minimum: 10 }
+        source:
+          type: object
+          required: [system, reachable]
+          properties:
+            system: { type: string }
+            reachable: { type: boolean, description: Отвечает ли Diasoft на проверки адаптера }
+            lastSuccessfulPollAt: { type: string, format: date-time }
+        outbox:
+          type: object
+          required: [pending, deadLetter]
+          properties:
+            pending: { type: integer, minimum: 0, description: Событий ждут отправки }
+            oldestPendingAgeSec: { type: integer, minimum: 0 }
+            deadLetter: { type: integer, minimum: 0, description: Событий в DLQ, требуют разбора }
+
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string }
+        detail: { type: string }
+        traceId: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }

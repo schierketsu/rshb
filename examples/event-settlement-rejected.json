@@ -1,0 +1,43 @@
+{
+  "specVersion": "1.0",
+  "eventId": "0192f1a5-0b11-7c02-a3f7-9e1d2c3b4a55",
+  "eventType": "SETTLEMENT_REJECTED",
+  "category": "OPERATION",
+  "state": "FIRING",
+  "severity": "CRITICAL",
+  "occurredAt": "2026-10-26T12:04:09+03:00",
+  "detectedAt": "2026-10-26T12:04:40+03:00",
+  "sequence": 1,
+  "correlationKey": "TREASURY_SEC_SETTLEMENT:SETTLEMENT_REJECTED",
+  "source": {
+    "system": "DIASOFT_FA_TREASURY_BACK",
+    "instance": "tb-app-prod-02",
+    "module": "SECURITIES",
+    "environment": "PROD",
+    "adapterVersion": "1.4.0"
+  },
+  "service": {
+    "code": "TREASURY_SEC_SETTLEMENT",
+    "ciId": "CI-TB-SEC-01",
+    "name": "Расчёты по ценным бумагам и РЕПО"
+  },
+  "operation": {
+    "id": "REPO-2026-118204",
+    "type": "REPO",
+    "status": "REJECTED",
+    "stage": "SETTLEMENT",
+    "valueDate": "2026-10-26",
+    "currency": "RUB",
+    "amountClass": "VERY_LARGE"
+  },
+  "sla": {
+    "slaCode": "SLA-TRS-SEC",
+    "breached": true
+  },
+  "message": "Поручение на расчёты по сделке РЕПО REPO-2026-118204 отклонено депозитарием",
+  "details": {
+    "errorCode": "NSD-REJ-4012",
+    "errorText": "Несоответствие реквизитов встречного поручения",
+    "gateway": "NSD"
+  }
+}

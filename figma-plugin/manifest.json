@@ -1,0 +1,15 @@
+{
+  "name": "Диво × Diasoft · UI Kit",
+  "id": "divo-diasoft-ui-kit-generator",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": [
+    "figma"
+  ],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": [
+      "none"
+    ]
+  }
+}

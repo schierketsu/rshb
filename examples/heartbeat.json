@@ -1,0 +1,16 @@
+{
+  "adapterId": "treasury-adapter-prod-01",
+  "adapterVersion": "1.4.0",
+  "sentAt": "2026-10-26T11:48:00+03:00",
+  "intervalSec": 60,
+  "source": {
+    "system": "DIASOFT_FA_TREASURY_BACK",
+    "reachable": true,
+    "lastSuccessfulPollAt": "2026-10-26T11:47:55+03:00"
+  },
+  "outbox": {
+    "pending": 0,
+    "oldestPendingAgeSec": 0,
+    "deadLetter": 0
+  }
+}

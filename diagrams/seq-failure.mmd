@@ -1,0 +1,42 @@
+sequenceDiagram
+    autonumber
+    participant AD as Integration Adapter
+    participant OB as Outbox
+    participant DV as «Диво» Integration API
+    participant DLQ as Dead Letter Queue
+    participant MON as Корпоративный<br/>мониторинг
+
+    rect rgb(255, 244, 214)
+    Note over AD,DV: Сценарий А — «Диво» недоступно
+    AD->>OB: событие сохранено (status = PENDING)
+    AD->>DV: POST /events
+    DV--xAD: 503 / таймаут
+    Note over AD: повтор через 1 с, 2 с, 4 с … до 5 мин (+ джиттер)
+    AD->>DV: POST /events
+    DV--xAD: 503
+    Note over AD: 5 ошибок подряд ⇒ circuit breaker OPEN<br/>(новые события копятся в outbox, не теряются)
+    AD->>MON: алерт «доставка в Диво остановлена, в outbox N событий»
+    loop каждые 30 с
+        AD->>DV: пробный запрос (half-open)
+    end
+    DV-->>AD: 202
+    Note over AD: circuit breaker CLOSED
+    AD->>DV: POST /events/batch — досылка накопленного по порядку occurredAt
+    DV-->>AD: 207 Multi-Status (ACCEPTED / DUPLICATE по каждому)
+    Note right of DV: дубли безопасны: eventId = ключ идемпотентности
+    end
+
+    rect rgb(252, 228, 231)
+    Note over AD,DV: Сценарий Б — событие отклонено (ошибка данных)
+    AD->>DV: POST /events
+    DV-->>AD: 422 VALIDATION_ERROR (неизвестная КЕ)
+    AD->>DLQ: без повторов: перенос в DLQ с текстом ошибки
+    AD->>MON: алерт команде интеграции (обновить справочник КЕ)
+    end
+
+    rect rgb(231, 238, 255)
+    Note over AD,DV: Сценарий В — перегрузка
+    AD->>DV: POST /events/batch
+    DV-->>AD: 429 Retry-After: 20
+    Note over AD: пауза 20 с, затем повтор
+    end

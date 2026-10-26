@@ -1,0 +1,55 @@
+{
+  "specVersion": "1.0",
+  "eventId": "0192f1a4-7c3e-7b21-9a4d-3c5e8f1b2a10",
+  "eventType": "OPERATION_DELAYED",
+  "category": "OPERATION",
+  "state": "FIRING",
+  "severity": "MAJOR",
+  "occurredAt": "2026-10-26T11:30:00+03:00",
+  "detectedAt": "2026-10-26T11:47:21+03:00",
+  "sequence": 1,
+  "correlationKey": "TREASURY_FX_MM_SETTLEMENT:OPERATION_DELAYED",
+  "source": {
+    "system": "DIASOFT_FA_TREASURY_BACK",
+    "instance": "tb-app-prod-02",
+    "module": "SETTLEMENT",
+    "environment": "PROD",
+    "adapterVersion": "1.4.0"
+  },
+  "service": {
+    "code": "TREASURY_FX_MM_SETTLEMENT",
+    "ciId": "CI-TB-SETTL-01",
+    "name": "Расчёты по сделкам FX и МБК"
+  },
+  "operation": {
+    "id": "FX-2026-834724",
+    "type": "FX_SWAP",
+    "status": "PROCESSING",
+    "stage": "SETTLEMENT",
+    "valueDate": "2026-10-26",
+    "currency": "USD",
+    "amountClass": "LARGE"
+  },
+  "metrics": {
+    "expectedDurationSec": 300,
+    "actualDurationSec": 1320,
+    "deviationPct": 340.0,
+    "threshold": 300
+  },
+  "sla": {
+    "slaCode": "SLA-TRS-SETTL",
+    "deadline": "2026-10-26T15:30:00+03:00",
+    "breached": false,
+    "timeToBreachSec": 13359
+  },
+  "message": "Превышено нормативное время расчёта по сделке FX-2026-834724 (22 мин при нормативе 5 мин), валютирование сегодня",
+  "details": {
+    "errorCode": "TB-SETTL-WAIT-ACK",
+    "errorText": "Нет подтверждения исполнения платёжного поручения от расчётной системы",
+    "runbookUrl": "https://wiki.rshb.local/runbooks/treasury/settlement-delay"
+  },
+  "tags": [
+    "value-date-today",
+    "usd"
+  ]
+}
