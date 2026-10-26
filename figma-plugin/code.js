@@ -708,55 +708,47 @@ async function buildComponents(page) {
 
   // ---- Строка события
   {
-    const body = await section(root, 'Строка события', 'Строка таблицы мониторинга: ячейки на серой подложке со скруглением 6 и зазором 4, как в отчёте о деградациях. Критичность и состояние — вложенные экземпляры (меняются в панели свойств).', 'VERTICAL');
-    const panel = AL('VERTICAL', 'Пример таблицы'); panel.itemSpacing = 4; pad(panel, 'lg', 'lg'); cardStyle(panel, 'lg'); body.appendChild(panel);
-    const c = COMP('Строка события'); c.itemSpacing = 4; c.counterAxisAlignItems = 'MIN'; fixW(c, 1352);
+    const body = await section(root, 'Строка события', 'Строка таблицы мониторинга: белый фон и тонкая линия снизу, шесть колонок. Критичность и состояние — вложенные экземпляры (меняются в панели свойств).', 'VERTICAL');
+    const panel = AL('VERTICAL', 'Пример таблицы'); pad(panel, 'lg', 'lg'); cardStyle(panel, 'lg'); body.appendChild(panel);
+    const COLS = [['Критичность', 132], ['Событие', null], ['ИТ-услуга', 200], ['Отклонение', 150], ['SLA', 170], ['Состояние', 160]];
+
+    const h = COMP('Заголовок таблицы'); h.counterAxisAlignItems = 'CENTER'; fixW(h, 1328); h.paddingLeft = 16; h.paddingRight = 16; fixBox(h, 1328, 40); rad(h, 'md'); fill(h, 'color/bg/wash');
+    panel.appendChild(h);
+    for (const [name, w] of COLS) {
+      const t = await T(name, 'smallBold', 'color/text/secondary'); h.appendChild(t);
+      if (w) { t.resize(w, t.height); t.textAutoResize = 'HEIGHT'; } else t.layoutGrow = 1;
+    }
+    K.head = h;
+
+    const c = COMP('Строка события'); c.counterAxisAlignItems = 'CENTER'; c.paddingLeft = 16; c.paddingRight = 16; c.paddingTop = 14; c.paddingBottom = 14;
+    fixW(c, 1328); c.strokes = [vpaint('color/line/default')]; c.strokeAlign = 'INSIDE'; c.strokeTopWeight = 0; c.strokeLeftWeight = 0; c.strokeRightWeight = 0; c.strokeBottomWeight = 1;
     panel.appendChild(c);
-    const cellF = (name, w) => {
-      const f = AL('VERTICAL', name); f.itemSpacing = 2; f.paddingTop = 10; f.paddingBottom = 10; f.paddingLeft = 12; f.paddingRight = 12; rad(f, 'sm'); fill(f, 'color/bg/wash');
-      f.primaryAxisAlignItems = 'CENTER';
-      c.appendChild(f);
-      if (w) { f.resize(w, 58); f.primaryAxisSizingMode = 'FIXED'; f.counterAxisSizingMode = 'FIXED'; }
-      f.layoutSizingVertical = 'FILL';
+    const col = (name, w) => {
+      const f = AL('VERTICAL', name); f.itemSpacing = 2; c.appendChild(f);
+      if (w) fixW(f, w); else f.layoutGrow = 1;
       return f;
     };
-    const sevCell = cellF('Критичность', 120); sevCell.counterAxisAlignItems = 'MIN';
-    const sb = inst(K.sev, { 'Вид': 'Тон', 'Уровень': 'CRITICAL' }); sb.name = 'Критичность'; sevCell.appendChild(sb);
-    const tm = cellF('Время', 76);
-    tm.appendChild(await T('19:30', 'cellBold', 'color/text/primary', { name: 'Время' }));
-    tm.appendChild(await T('26.10', 'small', 'color/text/secondary', { name: 'Дата' }));
-    const ev = cellF('Событие', null); ev.layoutGrow = 1;
-    wrap(append(ev, await T('Задержка закрытия операционного дня', 'cellBold', 'color/text/primary', { name: 'Событие' })));
-    wrap(append(ev, await T('EOD_CLOSE_DELAYED · шаг 07 «Переоценка»', 'small', 'color/text/secondary', { name: 'Код' })));
-    const sv = cellF('ИТ-услуга', 196);
+    const sevCol = col('Критичность', 132);
+    const sb = inst(K.sev, { 'Вид': 'Тон', 'Уровень': 'CRITICAL' }); sb.name = 'Критичность'; sevCol.appendChild(sb);
+    const ev = col('Событие', null);
+    wrap(append(ev, await T('Задержка закрытия операционного дня', 'bodyBold', 'color/text/primary', { name: 'Событие' })));
+    wrap(append(ev, await T('19:30 · EOD_CLOSE_DELAYED', 'small', 'color/text/secondary', { name: 'Код' })));
+    const sv = col('ИТ-услуга', 200);
     sv.appendChild(await T('Закрытие опердня', 'cell', 'color/text/primary', { name: 'Услуга' }));
-    sv.appendChild(await T('CI-TB-EOD-01', 'small', 'color/text/secondary', { name: 'КЕ' }));
-    const dv = cellF('Отклонение', 124);
-    dv.appendChild(await T('+173 %', 'cellBold', 'color/critical/strong', { name: 'Отклонение' }));
+    const dv = col('Отклонение', 150);
+    dv.appendChild(await T('+173 %', 'bodyBold', 'color/critical/strong', { name: 'Отклонение' }));
     dv.appendChild(await T('27 из 10 мин', 'small', 'color/text/secondary', { name: 'Норматив' }));
-    const sl = cellF('SLA', 148);
+    const sl = col('SLA', 170);
     sl.appendChild(await T('осталось 22 мин', 'cellBold', 'color/critical/strong', { name: 'SLA' }));
-    const ic = cellF('Инцидент', 110);
-    ic.appendChild(await T('INC-18501', 'cellBold', 'color/info/default', { name: 'Инцидент' }));
-    const stc = cellF('Состояние', 140);
+    const stc = col('Состояние', 160);
     const sti = inst(K.state, { 'Состояние': 'Активно' }); sti.name = 'Состояние'; stc.appendChild(sti);
     sb.isExposedInstance = true; sti.isExposedInstance = true;
     c.description = 'Строка таблицы событий. Ширина — Fill по таблице.';
     K.row = c;
     K.rowProps = {};
-    for (const [p, def] of [['Время', '19:30'], ['Дата', '26.10'], ['Событие', 'Задержка закрытия операционного дня'], ['Код', 'EOD_CLOSE_DELAYED · шаг 07 «Переоценка»'], ['Услуга', 'Закрытие опердня'], ['КЕ', 'CI-TB-EOD-01'], ['Отклонение', '+173 %'], ['Норматив', '27 из 10 мин'], ['SLA', 'осталось 22 мин'], ['Инцидент', 'INC-18501']]) {
+    for (const [p, def] of [['Событие', 'Задержка закрытия операционного дня'], ['Код', '19:30 · EOD_CLOSE_DELAYED'], ['Услуга', 'Закрытие опердня'], ['Отклонение', '+173 %'], ['Норматив', '27 из 10 мин'], ['SLA', 'осталось 22 мин']]) {
       K.rowProps[p] = textProp(c, p, def, p);
     }
-
-    // Заголовок таблицы
-    const h = COMP('Заголовок таблицы'); h.itemSpacing = 4; fixW(h, 1352); panel.insertChild(0, h);
-    for (const [name, w] of [['Критичность', 120], ['Время', 76], ['Событие', null], ['ИТ-услуга', 196], ['Отклонение', 124], ['SLA', 148], ['Инцидент', 110], ['Состояние', 140]]) {
-      const f = AL('HORIZONTAL', name); f.counterAxisAlignItems = 'CENTER'; f.paddingLeft = 12; f.paddingRight = 12; rad(f, 'sm'); fill(f, 'color/bg/wash');
-      h.appendChild(f);
-      if (w) fixBox(f, w, 40); else { f.resize(100, 40); f.counterAxisSizingMode = 'FIXED'; f.layoutGrow = 1; }
-      f.appendChild(await T(name, 'cellBold', 'color/text/primary'));
-    }
-    K.head = h;
   }
 
   // ---- Шапка
@@ -794,7 +786,7 @@ async function buildComponents(page) {
 const SW = 1440;
 function screen(parent, name) {
   const s = AL('VERTICAL', name);
-  fixW(s, SW); s.itemSpacing = 16; pad(s, 'xl', 'xl');
+  fixW(s, SW); s.itemSpacing = 16; pad(s, 'xl', '2xl');
   s.clipsContent = true; fill(s, 'color/bg/page');
   parent.appendChild(s);
   STATS.screens++;
@@ -858,241 +850,180 @@ async function serviceBar(parent, name, parts, scale) {
 
 async function monitoringScreen(root, K) {
   const s = screen(root, '01 · Мониторинг событий');
+  s.itemSpacing = 24;
   header(K, s, 'Сервис');
 
-  // Панель фильтров
-  const bar = AL('HORIZONTAL', 'Фильтры'); bar.itemSpacing = 12; bar.counterAxisAlignItems = 'CENTER'; append(s, bar, { fillW: true });
-  bar.appendChild(seg(K, ['24 часа', '7 дней', '30 дней'], 1));
-  bar.appendChild(iconBtn(K, 'Шеврон влево'));
-  bar.appendChild(select(K, '26 октября 2026'));
-  const nx = iconBtn(K, 'Шеврон вправо'); nx.opacity = 0.4; bar.appendChild(nx);
-  vline(bar);
-  bar.appendChild(await label('Услуга'));
-  bar.appendChild(select(K, 'Все 6'));
-  bar.appendChild(await label('Критичность'));
-  bar.appendChild(select(K, 'Все'));
-  spacer(bar);
-  bar.appendChild(inst(K.integration, { 'Состояние': 'Работает' }));
-  bar.appendChild(iconBtn(K, 'Экспорт', 'Экспорт'));
+  // Заголовок страницы + статус интеграции
+  const top = AL('HORIZONTAL', 'Заголовок'); top.counterAxisAlignItems = 'CENTER'; top.itemSpacing = 16; append(s, top, { fillW: true });
+  const tt = AL('VERTICAL', 'Текст'); tt.itemSpacing = 4; top.appendChild(tt);
+  tt.appendChild(await T('Мониторинг событий', 'h1', 'color/text/primary'));
+  tt.appendChild(await T('Казначейство · Diasoft FA# Treasury.Back', 'body', 'color/text/secondary'));
+  spacer(top);
+  top.appendChild(inst(K.integration, { 'Состояние': 'Работает' }));
 
-  // Сводка: кольцо + легенда | услуги | ключевые показатели
-  const sum = card(s, 'Сводка', 'HORIZONTAL', false);
-  const c1 = AL('HORIZONTAL', 'Активные события'); c1.itemSpacing = 28; c1.counterAxisAlignItems = 'CENTER'; pad(c1, 'lg', 'lg'); sum.appendChild(c1);
-  stroke(c1, 'color/line/default', 0); c1.strokeRightWeight = 1;
-  await donut(c1, [[1, 'critical'], [2, 'major'], [2, 'warning']], '5', 'активных');
-  const lg = AL('VERTICAL', 'Легенда'); lg.itemSpacing = 14; c1.appendChild(lg);
-  lg.appendChild(await T('Активные события', 'h2', 'color/text/primary'));
-  for (const [lvl, n, p] of [['CRITICAL', '1', '20 %'], ['MAJOR', '2', '40 %'], ['WARNING', '2', '40 %']]) {
-    const l = inst(K.legend, { 'Уровень': lvl }); l.setProperties({ [K.legendNum]: n, [K.legendPct]: p }); lg.appendChild(l);
-  }
-  const c2 = AL('VERTICAL', 'Услуги'); c2.itemSpacing = 12; pad(c2, 'lg', 'lg'); append(sum, c2, { grow: true });
-  stroke(c2, 'color/line/default', 0); c2.strokeRightWeight = 1;
-  c2.appendChild(await T('События по услугам за 24 часа', 'h2', 'color/text/primary'));
-  const bars = AL('VERTICAL', 'Полосы'); bars.itemSpacing = 10; append(c2, bars, { fillW: true });
-  // события за сутки (включая устранённые) по уровням: CRITICAL, MAJOR, WARNING
-  const today = { TREASURY_DEAL_CAPTURE: [1, 0, 1], TREASURY_FX_MM_SETTLEMENT: [0, 2, 0], TREASURY_SEC_SETTLEMENT: [1, 0, 1], TREASURY_EOD: [1, 0, 0], TREASURY_MARKET_DATA: [0, 1, 0] };
-  for (const sv of SERVICES.slice(0, 5)) {
-    const t = today[sv.code];
-    await serviceBar(bars, sv.short, [[t[0], 'critical'], [t[1], 'major'], [t[2], 'warning']], 120);
-  }
-  const c3 = AL('VERTICAL', 'Показатели'); c3.itemSpacing = 12; pad(c3, 'lg', 'lg'); sum.appendChild(c3); fixW(c3, 360);
-  for (const n of [c1, c2, c3]) n.layoutSizingVertical = 'FILL';
-  c3.itemSpacing = 14;
-  const metrics = [['critical', 'SLA под угрозой', '1', 'Закрытие дня: 22 мин до дедлайна'], [null, 'Открытые инциденты', '3', 'все созданы автоматически'], ['ok', 'Время обнаружения', '1 мин 12 с', 'медиана за сегодня · цель до 2 мин']];
-  for (let i = 0; i < metrics.length; i++) {
-    const [role, t, v, sub] = metrics[i];
-    if (i) { const l = figma.createRectangle(); l.name = 'Линия'; l.resize(100, 1); fill(l, 'color/line/default'); append(c3, l, { fillW: true }); }
-    const m = AL('VERTICAL', t); m.itemSpacing = 2; append(c3, m, { fillW: true });
-    m.appendChild(await T(t, 'small', 'color/text/secondary'));
-    m.appendChild(await T(v, 'h1', role === 'critical' ? 'color/critical/default' : role === 'ok' ? 'color/ok/strong' : 'color/text/primary'));
-    wrap(append(m, await T(sub, 'small', role === 'critical' ? 'color/critical/strong' : 'color/text/secondary')));
-  }
+  // KPI
+  const kr = AL('HORIZONTAL', 'Показатели'); kr.itemSpacing = 16; append(s, kr, { fillW: true });
+  for (const [acc, t, v, sub] of [
+    ['Нет', 'Активные события', '5', '1 CRITICAL · 2 MAJOR · 2 WARNING'],
+    ['Критично', 'SLA под угрозой', '1', 'закрытие дня: 22 мин до дедлайна'],
+    ['Нет', 'Открытые инциденты', '3', 'все созданы автоматически'],
+    ['Норма', 'Время обнаружения', '1 мин 12 с', 'медиана за сегодня'],
+  ]) append(kr, kpi(K, acc, t, v, sub), { grow: true });
 
-  // Таблица событий
-  const tb = card(s, 'События');
-  const th = AL('HORIZONTAL', 'Заголовок'); th.counterAxisAlignItems = 'CENTER'; th.itemSpacing = 12; append(tb, th, { fillW: true });
-  th.appendChild(await T('События', 'h2', 'color/text/primary'));
-  th.appendChild(seg(K, ['Все 8', 'Активные 5', 'Устранённые 3'], 1));
+  // Таблица
+  const tb = card(s, 'События'); tb.itemSpacing = 12;
+  const th = AL('HORIZONTAL', 'Панель'); th.counterAxisAlignItems = 'CENTER'; th.itemSpacing = 12; append(tb, th, { fillW: true });
+  th.appendChild(seg(K, ['Активные 5', 'Устранённые 3', 'Все 8'], 1));
   spacer(th);
-  th.appendChild(await T('Сгруппировано по correlationKey · обновлено 19:38:40', 'small', 'color/text/secondary'));
-  const tbl = AL('VERTICAL', 'Таблица'); tbl.itemSpacing = 4; append(tb, tbl, { fillW: true });
+  th.appendChild(select(K, 'Все услуги'));
+  th.appendChild(select(K, 'За 24 часа'));
+  const tbl = AL('VERTICAL', 'Таблица'); append(tb, tbl, { fillW: true });
   append(tbl, inst(K.head), { fillW: true });
-  for (const e of EVENTS) {
+  const rows = EVENTS.filter((e) => e.active).concat(EVENTS.filter((e) => !e.active).slice(0, 1));
+  for (const e of rows) {
     const r = inst(K.row); append(tbl, r, { fillW: true }); r.name = `${e.time} · ${e.code}`;
     const P = K.rowProps;
-    r.setProperties({ [P['Время']]: e.time, [P['Событие']]: e.title, [P['Код']]: `${e.code} · ${e.obj}`, [P['Услуга']]: e.svc, [P['КЕ']]: e.ci, [P['Отклонение']]: e.dev, [P['Норматив']]: e.devSub, [P['SLA']]: e.sla, [P['Инцидент']]: e.inc });
+    r.setProperties({ [P['Событие']]: e.title, [P['Код']]: `${e.time} · ${e.code}`, [P['Услуга']]: e.svc, [P['Отклонение']]: e.dev, [P['Норматив']]: e.devSub, [P['SLA']]: e.sla });
     const sb = nested(r, 'Критичность'); if (sb) sb.setProperties({ 'Уровень': e.sev });
     const st = nested(r, 'Состояние');
     if (st) { st.setProperties({ 'Состояние': e.active ? 'Активно' : 'Устранено' }); if (!e.active) st.setProperties({ [K.stateText]: 'Устранено ' + e.resolved }); }
     const dvT = textIn(r, 'Отклонение'); if (dvT) fill(dvT, e.active ? `color/${SEV[e.sev]}/strong` : 'color/text/secondary');
-    const slT = textIn(r, 'SLA'); if (slT) fill(slT, e.slaRole === 'critical' ? 'color/critical/strong' : e.slaRole === 'ok' ? 'color/ok/strong' : 'color/text/secondary');
-    const inT = textIn(r, 'Инцидент'); if (inT && e.inc === '—') fill(inT, 'color/text/secondary');
+    const slT = textIn(r, 'SLA'); if (slT) fill(slT, e.slaRole === 'critical' ? 'color/critical/strong' : e.slaRole === 'ok' ? 'color/ok/strong' : 'color/text/primary');
     if (!e.active) { const evT = textIn(r, 'Событие'); if (evT) fill(evT, 'color/text/secondary'); if (sb) sb.opacity = 0.55; }
   }
-  const ft = AL('HORIZONTAL', 'Подвал'); ft.counterAxisAlignItems = 'CENTER'; ft.itemSpacing = 8; append(tb, ft, { fillW: true });
-  ft.appendChild(await T('Показано 8 из 37 событий за 24 часа · устранённые закрыты автоматически по событию RESOLVED', 'small', 'color/text/secondary'));
+  const ft = AL('HORIZONTAL', 'Подвал'); ft.counterAxisAlignItems = 'CENTER'; append(tb, ft, { fillW: true });
+  ft.appendChild(await T('Похожие события сгруппированы. Устранённые закрываются сами по событию RESOLVED.', 'small', 'color/text/secondary'));
   spacer(ft);
-  ft.appendChild(iconBtn(K, 'Шеврон влево'));
-  ft.appendChild(select(K, 'Страница 1 из 5'));
-  ft.appendChild(iconBtn(K, 'Шеврон вправо'));
+  ft.appendChild(btn(K, 'Показать все 37', 'Призрачная'));
   return s;
 }
 
-async function eventDialogScreen(root, K, base) {
-  const s = base.clone(); root.appendChild(s); s.name = '02 · Карточка события'; STATS.screens++;
-  const ov = figma.createRectangle(); ov.name = 'Затемнение'; s.appendChild(ov); ov.layoutPositioning = 'ABSOLUTE';
-  ov.resize(SW, 2400); ov.x = 0; ov.y = 0; ov.fills = [solid('#0F172A', 0.35)];
+async function eventCardScreen(root, K) {
+  const s = screen(root, '02 · Карточка события');
+  s.itemSpacing = 24;
+  header(K, s, 'Сервис');
 
-  const d = AL('VERTICAL', 'Окно события'); d.itemSpacing = 16; pad(d, '2xl', '2xl'); fill(d, 'color/bg/card'); rad(d, '2xl');
-  d.effects = [{ type: 'DROP_SHADOW', color: { r: 15 / 255, g: 23 / 255, b: 42 / 255, a: 0.18 }, offset: { x: 0, y: 12 }, radius: 40, spread: 0, visible: true, blendMode: 'NORMAL' }];
-  s.appendChild(d); d.layoutPositioning = 'ABSOLUTE'; fixW(d, 1040); d.x = (SW - 1040) / 2; d.y = 56;
-
-  // Заголовок окна
-  const top = AL('HORIZONTAL', 'Заголовок'); top.itemSpacing = 16; top.counterAxisAlignItems = 'MIN'; append(d, top, { fillW: true });
-  const tt = AL('VERTICAL', 'Текст'); tt.itemSpacing = 8; append(top, tt, { grow: true });
+  // Заголовок
+  const back = AL('HORIZONTAL', 'Назад'); back.itemSpacing = 6; back.counterAxisAlignItems = 'CENTER'; s.appendChild(back);
+  const bi = inst(K.icon['Шеврон влево']); bi.name = 'Иконка'; back.appendChild(bi);
+  back.appendChild(await T('Мониторинг событий', 'body', 'color/text/secondary'));
+  const top = AL('HORIZONTAL', 'Заголовок'); top.counterAxisAlignItems = 'MAX'; top.itemSpacing = 24; append(s, top, { fillW: true });
+  const tt = AL('VERTICAL', 'Текст'); tt.itemSpacing = 10; append(top, tt, { grow: true });
   const tags = AL('HORIZONTAL', 'Метки'); tags.itemSpacing = 8; tags.counterAxisAlignItems = 'CENTER'; tt.appendChild(tags);
   tags.appendChild(inst(K.sev, { 'Вид': 'Тон', 'Уровень': 'CRITICAL' }));
   tags.appendChild(inst(K.state, { 'Состояние': 'Активно' }));
-  tags.appendChild(await T('EOD_CLOSE_DELAYED · 3 события по ключу · обновлено 19:37:18', 'small', 'color/text/secondary'));
-  wrap(append(tt, await T('Закрытие операционного дня: 27 мин при нормативе 10 мин', 'h1', 'color/text/primary')));
-  wrap(append(tt, await T('Шаг EOD_STEP_07 «Переоценка позиций» не завершён · Diasoft FA# Treasury.Back · tb-batch-prod-01', 'body', 'color/text/secondary')));
-  const x = inst(K.icon['Закрыть']); x.name = 'Закрыть'; x.rescale(1.4); top.appendChild(x);
+  wrap(append(tt, await T('Закрытие операционного дня задерживается', 'h1', 'color/text/primary')));
+  wrap(append(tt, await T('Шаг «Переоценка позиций» идёт 27 мин при нормативе 10 мин', 'body', 'color/text/secondary')));
+  const acts = AL('HORIZONTAL', 'Действия'); acts.itemSpacing = 12; acts.counterAxisAlignItems = 'CENTER'; top.appendChild(acts);
+  acts.appendChild(iconBtn(K, 'Ссылка', 'Инструкция'));
+  acts.appendChild(btn(K, 'Открыть инцидент', 'Основная'));
 
-  // Отклонение от норматива — шкала как «Границы деградации»
-  const dv = AL('VERTICAL', 'Отклонение'); dv.itemSpacing = 14; pad(dv, 'lg', 'xl'); cardStyle(dv, 'xl'); append(d, dv, { fillW: true });
-  dv.appendChild(await T('Отклонение от норматива', 'h2', 'color/text/primary'));
-  const W = 920, span = 50;
-  const scale = figma.createFrame(); scale.name = 'Шкала'; scale.resize(W, 78); scale.fills = []; scale.clipsContent = false; dv.appendChild(scale);
-  const zones = [[0, 10, 'ok'], [10, 15, 'warning'], [15, 20, 'major'], [20, 50, 'critical']];
+  // Две колонки
+  const cols = AL('HORIZONTAL', 'Колонки'); cols.itemSpacing = 24; append(s, cols, { fillW: true });
+  const left = AL('VERTICAL', 'Слева'); left.itemSpacing = 24; append(cols, left, { grow: true });
+
+  // Запас до дедлайна
+  const dv = AL('VERTICAL', 'До дедлайна'); dv.itemSpacing = 20; pad(dv, 'xl', 'xl'); cardStyle(dv, 'lg'); append(left, dv, { fillW: true });
+  const nums = AL('HORIZONTAL', 'Числа'); nums.itemSpacing = 48; append(dv, nums, { fillW: true });
+  for (const [t, v, col] of [['До нарушения SLA', '22 мин', 'color/critical/default'], ['Идёт', '27 мин', 'color/text/primary'], ['Норматив', '10 мин', 'color/text/primary']]) {
+    const c = AL('VERTICAL', t); c.itemSpacing = 2; nums.appendChild(c);
+    c.appendChild(await T(t, 'small', 'color/text/secondary'));
+    c.appendChild(await T(v, 'kpi', col));
+  }
+  const W = SW - 64 * 2 - 400 - 24 - 32 * 2, span = 50;
+  const scale = figma.createFrame(); scale.name = 'Шкала'; scale.resize(W, 52); scale.fills = []; scale.clipsContent = false; dv.appendChild(scale);
+  const zones = [[0, 10, 'ok'], [10, 20, 'major'], [20, 50, 'critical']];
   zones.forEach(([a, b, role], i) => {
-    const z = figma.createRectangle(); z.name = role; z.resize((b - a) / span * W, 28); fill(z, `color/${role}/muted`);
-    z.topLeftRadius = i === 0 ? 8 : 0; z.bottomLeftRadius = i === 0 ? 8 : 0; z.topRightRadius = i === 3 ? 8 : 0; z.bottomRightRadius = i === 3 ? 8 : 0;
-    scale.appendChild(z); z.x = a / span * W; z.y = 22;
+    const z = figma.createRectangle(); z.name = role; z.resize((b - a) / span * W - 3, 12); fill(z, `color/${role}/muted`); z.cornerRadius = 6;
+    scale.appendChild(z); z.x = a / span * W + (i ? 3 : 0); z.y = 6;
   });
-  const now = 27.3 / span * W;
-  const pin = figma.createRectangle(); pin.name = 'Сейчас'; pin.resize(2, 38); fill(pin, 'color/text/primary'); scale.appendChild(pin); pin.x = now - 1; pin.y = 16;
-  const knob = figma.createEllipse(); knob.name = 'Метка'; knob.resize(14, 14); fill(knob, 'color/bg/card'); knob.strokes = [vpaint('color/text/primary')]; knob.strokeWeight = 3; scale.appendChild(knob); knob.x = now - 7; knob.y = 29;
-  const nowL = await T('сейчас 19:37', 'smallBold', 'color/text/primary'); scale.appendChild(nowL); nowL.x = now - 36; nowL.y = 0;
-  for (const [m, t] of [[0, '19:10 старт'], [10, '19:20 норматив'], [20, '19:30 · 30 мин до SLA'], [50, '20:00 дедлайн']]) {
-    const l = await T(t, 'small', m === 50 ? 'color/critical/strong' : 'color/text/secondary'); scale.appendChild(l);
-    l.x = m === 0 ? 0 : m === 50 ? W - 82 : m / span * W - 10; l.y = 58;
-  }
-  const tiles = AL('HORIZONTAL', 'Показатели'); tiles.itemSpacing = 12; append(dv, tiles, { fillW: true });
-  for (const [t, v, role] of [['Фактически', '27 мин 18 с', null], ['Норматив', '10 мин', 'ok'], ['Превышение', '+173 %', 'major'], ['До нарушения SLA', '22 мин 42 с', 'critical']]) {
-    const c = AL('VERTICAL', t); c.itemSpacing = 6; pad(c, 'sm', 'md'); cardStyle(c, 'lg'); append(tiles, c, { grow: true });
-    const hr = AL('HORIZONTAL', 'Название'); hr.itemSpacing = 8; hr.counterAxisAlignItems = 'CENTER'; c.appendChild(hr);
-    const dt = figma.createEllipse(); dt.name = 'Точка'; dt.resize(10, 10); fill(dt, role ? `color/${role}/default` : 'color/text/primary'); hr.appendChild(dt);
-    hr.appendChild(await T(t, 'small', 'color/text/secondary'));
-    const vv = AL('HORIZONTAL', 'Значение'); center(vv); vv.paddingTop = 10; vv.paddingBottom = 10; rad(vv, 'md'); fill(vv, 'color/bg/wash'); append(c, vv, { fillW: true });
-    vv.appendChild(await T(v, 'bodyBold', role === 'critical' ? 'color/critical/strong' : 'color/text/primary'));
+  const now = 27 / span * W;
+  const knob = figma.createEllipse(); knob.name = 'Сейчас'; knob.resize(20, 20); fill(knob, 'color/bg/card'); knob.strokes = [vpaint('color/text/primary')]; knob.strokeWeight = 4; scale.appendChild(knob); knob.x = now - 10; knob.y = 2;
+  for (const [m, t, col] of [[0, '19:10 старт', 'color/text/secondary'], [10, '19:20 норматив', 'color/text/secondary'], [27, 'сейчас', 'color/text/primary'], [50, '20:00 дедлайн', 'color/critical/strong']]) {
+    const l = await T(t, m === 27 ? 'smallBold' : 'small', col); scale.appendChild(l);
+    l.x = m === 0 ? 0 : m === 50 ? W - l.width : m / span * W - l.width / 2; l.y = 32;
   }
 
-  // Хронология + сведения
-  const two = AL('HORIZONTAL', 'Детали'); two.itemSpacing = 16; append(d, two, { fillW: true });
-  const tl = AL('VERTICAL', 'Хронология'); tl.itemSpacing = 12; pad(tl, 'lg', 'xl'); cardStyle(tl, 'xl'); append(two, tl, { grow: true });
-  tl.appendChild(await T('Хронология', 'h2', 'color/text/primary'));
+  // Хронология
+  const tl = AL('VERTICAL', 'Хронология'); tl.itemSpacing = 16; pad(tl, 'xl', 'xl'); cardStyle(tl, 'lg'); append(left, tl, { fillW: true });
+  tl.appendChild(await T('Что произошло', 'h2', 'color/text/primary'));
   for (const [m, t, src, text] of [
-    ['Источник', '19:10:00', 'Diasoft', 'Старт шага EOD_STEP_07 «Переоценка позиций»'],
-    ['WARNING', '19:20:00', 'Адаптер', 'Норматив 10 мин превышен — WARNING (seq 1)'],
-    ['MAJOR', '19:25:00', 'Адаптер', 'Превышение 50 % — MAJOR (seq 2)'],
-    ['CRITICAL', '19:30:00', 'Адаптер', 'До дедлайна SLA 30 мин — CRITICAL (seq 3)'],
-    ['Диво', '19:30:01', '«Диво»', 'Событие принято (202), добавлено в оповещение'],
-    ['Диво', '19:30:02', '«Диво»', 'Создан инцидент INC-18501 · P2 · «Сопровождение Diasoft Treasury»'],
-    ['Диво', '19:30:03', '«Диво»', 'Дежурный уведомлён: SMS и почта'],
+    ['Источник', '19:10', 'Diasoft', 'Начался шаг «Переоценка позиций»'],
+    ['WARNING', '19:20', 'Адаптер', 'Норматив превышен — WARNING'],
+    ['CRITICAL', '19:30', 'Адаптер', 'До дедлайна 30 мин — CRITICAL'],
+    ['Диво', '19:30', '«Диво»', 'Создан инцидент INC-18501, дежурный уведомлён'],
   ]) {
     const it = inst(K.tl, { 'Метка': m }); it.setProperties({ [K.tlTime]: t, [K.tlSrc]: src, [K.tlText]: text }); append(tl, it, { fillW: true });
   }
-  const info = AL('VERTICAL', 'Сведения'); info.itemSpacing = 12; pad(info, 'lg', 'xl'); cardStyle(info, 'xl'); two.appendChild(info); fixW(info, 360);
-  info.appendChild(await T('ИТ-услуга и инцидент', 'h2', 'color/text/primary'));
-  for (const [k, v, col] of [['ИТ-услуга', 'Закрытие операционного дня', null], ['КЕ (CMDB)', 'CI-TB-EOD-01 · критичность 1', null], ['SLA', 'SLA-TRS-EOD · до 20:00', null], ['Инцидент', 'INC-18501 · P2 · в работе', 'color/info/default'], ['Группа', 'Сопровождение Diasoft Treasury', null], ['Создан', 'автоматически за 2 с', null]]) {
+
+  // Справа — сведения
+  const info = AL('VERTICAL', 'Сведения'); info.itemSpacing = 20; pad(info, 'xl', 'xl'); cardStyle(info, 'lg'); cols.appendChild(info); fixW(info, 400);
+  info.appendChild(await T('Инцидент', 'h2', 'color/text/primary'));
+  for (const [k, v, col] of [['Номер', 'INC-18501 · P2 · в работе', 'color/info/default'], ['Группа', 'Сопровождение Diasoft Treasury', null], ['Создан', 'автоматически за 2 секунды', null]]) {
     const r = AL('VERTICAL', k); r.itemSpacing = 2; append(info, r, { fillW: true });
     r.appendChild(await T(k, 'small', 'color/text/secondary'));
-    wrap(append(r, await T(v, 'cellBold', col || 'color/text/primary')));
+    wrap(append(r, await T(v, 'bodyBold', col || 'color/text/primary')));
   }
-
-  // Подвал окна
-  const line = figma.createRectangle(); line.name = 'Линия'; line.resize(100, 1); fill(line, 'color/line/default'); append(d, line, { fillW: true });
-  const ft = AL('HORIZONTAL', 'Кнопки'); ft.itemSpacing = 12; ft.counterAxisAlignItems = 'CENTER'; append(d, ft, { fillW: true });
-  ft.appendChild(iconBtn(K, 'Код', 'Показать JSON'));
-  ft.appendChild(iconBtn(K, 'Ссылка', 'Инструкция'));
-  spacer(ft);
-  ft.appendChild(btn(K, 'Закрыть', 'Контур'));
-  ft.appendChild(btn(K, 'Открыть инцидент INC-18501', 'Основная'));
+  const line = figma.createRectangle(); line.name = 'Линия'; line.resize(100, 1); fill(line, 'color/line/default'); append(info, line, { fillW: true });
+  info.appendChild(await T('ИТ-услуга', 'h2', 'color/text/primary'));
+  for (const [k, v] of [['Услуга', 'Закрытие операционного дня'], ['КЕ', 'CI-TB-EOD-01'], ['SLA', 'до 20:00 ежедневно']]) {
+    const r = AL('VERTICAL', k); r.itemSpacing = 2; append(info, r, { fillW: true });
+    r.appendChild(await T(k, 'small', 'color/text/secondary'));
+    wrap(append(r, await T(v, 'bodyBold', 'color/text/primary')));
+  }
   return s;
 }
 
 async function dashboardScreen(root, K) {
   const s = screen(root, '03 · Дашборд «Диво Мера»');
+  s.itemSpacing = 24;
   header(K, s, 'Мера');
-  const bar = AL('HORIZONTAL', 'Фильтры'); bar.itemSpacing = 12; bar.counterAxisAlignItems = 'CENTER'; append(s, bar, { fillW: true });
-  bar.appendChild(seg(K, ['Месяц', 'Год', 'Диапазон'], 1));
-  bar.appendChild(iconBtn(K, 'Шеврон влево'));
-  bar.appendChild(select(K, 'Октябрь 2026'));
-  const nx = iconBtn(K, 'Шеврон вправо'); nx.opacity = 0.4; bar.appendChild(nx);
-  vline(bar);
-  bar.appendChild(await label('Блок'));
-  bar.appendChild(select(K, 'Казначейство'));
-  spacer(bar);
-  bar.appendChild(iconBtn(K, 'Экспорт', 'Экспорт'));
+  const top = AL('HORIZONTAL', 'Заголовок'); top.counterAxisAlignItems = 'CENTER'; top.itemSpacing = 12; append(s, top, { fillW: true });
+  const tt = AL('VERTICAL', 'Текст'); tt.itemSpacing = 4; top.appendChild(tt);
+  tt.appendChild(await T('Казначейские ИТ-услуги', 'h1', 'color/text/primary'));
+  tt.appendChild(await T('Октябрь 2026 · данные из Diasoft FA# Treasury.Back', 'body', 'color/text/secondary'));
+  spacer(top);
+  top.appendChild(seg(K, ['Месяц', 'Квартал', 'Год'], 1));
+  top.appendChild(iconBtn(K, 'Экспорт', 'Экспорт'));
 
   const kr = AL('HORIZONTAL', 'KPI'); kr.itemSpacing = 16; append(s, kr, { fillW: true });
-  for (const [acc, t, v, sub] of [['Норма', 'Доступность услуг', '99,94 %', 'цель 99,90 % · выполнено'], ['Нет', 'Операции в нормативе', '97,8 %', '41 260 операций'], ['Нет', 'Инциденты', '14', '13 созданы автоматически'], ['Нет', 'Время обнаружения', '1 мин 12 с', 'медиана · цель до 2 мин'], ['Нет', 'Время восстановления', '41 мин', 'медиана · цель до 60 мин']]) {
+  for (const [acc, t, v, sub] of [['Норма', 'Доступность', '99,94 %', 'цель 99,90 %'], ['Нет', 'Инциденты', '14', '13 созданы автоматически'], ['Нет', 'Время обнаружения', '1 мин 12 с', 'медиана, цель до 2 мин'], ['Нет', 'Время восстановления', '41 мин', 'медиана, цель до 60 мин']]) {
     append(kr, kpi(K, acc, t, v, sub), { grow: true });
   }
 
-  // Блок как в отчёте о деградациях: слева кольцо и полосы, справа детализация
-  const mb = card(s, 'Детализация', 'HORIZONTAL', false);
-  const left = AL('VERTICAL', 'Сводка'); left.itemSpacing = 16; pad(left, 'lg', 'lg'); mb.appendChild(left); fixW(left, 380);
-  stroke(left, 'color/line/default', 0); left.strokeRightWeight = 1;
-  const dn = AL('HORIZONTAL', 'Кольцо и легенда'); dn.itemSpacing = 24; dn.counterAxisAlignItems = 'CENTER'; left.appendChild(dn);
-  await donut(dn, [[9, 'critical'], [34, 'major'], [77, 'warning']], '120', 'событий', 150);
-  dn.itemSpacing = 20;
-  const lg = AL('VERTICAL', 'Легенда'); lg.itemSpacing = 14; dn.appendChild(lg); fixW(lg, 170);
+  const row = AL('HORIZONTAL', 'Блоки'); row.itemSpacing = 24; append(s, row, { fillW: true });
+  // Состояние услуг
+  const tb = AL('VERTICAL', 'Услуги'); tb.itemSpacing = 0; pad(tb, 'xl', 'xl'); cardStyle(tb, 'lg'); append(row, tb, { grow: true });
+  tb.appendChild(await T('Состояние услуг', 'h2', 'color/text/primary'));
+  const sp = figma.createFrame(); sp.name = 'Отступ'; sp.resize(1, 16); sp.fills = []; tb.appendChild(sp);
+  const COLS = [['Услуга', null], ['Сейчас', 170], ['Доступность', 120], ['30 дней', 220]];
+  const hr = AL('HORIZONTAL', 'Заголовок'); hr.counterAxisAlignItems = 'CENTER'; hr.paddingLeft = 12; hr.paddingRight = 12; rad(hr, 'md'); fill(hr, 'color/bg/wash'); append(tb, hr, { fillW: true }); hr.resize(100, 36); hr.counterAxisSizingMode = 'FIXED';
+  for (const [name, w] of COLS) { const t = await T(name, 'smallBold', 'color/text/secondary'); hr.appendChild(t); if (w) { t.resize(w, t.height); t.textAutoResize = 'HEIGHT'; } else t.layoutGrow = 1; }
+  for (const sv of SERVICES) {
+    const r = AL('HORIZONTAL', sv.short); r.counterAxisAlignItems = 'CENTER'; r.paddingLeft = 12; r.paddingRight = 12; r.paddingTop = 14; r.paddingBottom = 14;
+    r.strokes = [vpaint('color/line/default')]; r.strokeAlign = 'INSIDE'; r.strokeTopWeight = 0; r.strokeLeftWeight = 0; r.strokeRightWeight = 0; r.strokeBottomWeight = 1;
+    append(tb, r, { fillW: true });
+    const n = await T(sv.name, 'cell', 'color/text/primary'); r.appendChild(n); n.layoutGrow = 1;
+    const stw = AL('HORIZONTAL', 'Статус'); fixW(stw, 170); r.appendChild(stw); stw.appendChild(inst(K.status, { 'Статус': sv.st }));
+    const warn = sv.av === '99,90 %';
+    const av = await T(sv.av, 'cellBold', warn ? 'color/major/strong' : 'color/text/primary'); r.appendChild(av); av.resize(120, av.height); av.textAutoResize = 'HEIGHT';
+    const strip = AL('HORIZONTAL', '30 дней'); strip.itemSpacing = 3; strip.counterAxisAlignItems = 'CENTER'; r.appendChild(strip); fixW(strip, 220);
+    for (let i = 0; i < 30; i++) {
+      const ch = sv.days.charAt(i);
+      const role = ch === '1' ? 'warning' : ch === '2' ? 'major' : ch === '3' ? 'critical' : null;
+      const b = figma.createRectangle(); b.name = `День ${i + 1}`; b.resize(4, 20); b.cornerRadius = 2; fill(b, role ? `color/${role}/default` : 'color/ok/muted'); strip.appendChild(b);
+    }
+  }
+  // События за месяц
+  const ev = AL('VERTICAL', 'События'); ev.itemSpacing = 20; pad(ev, 'xl', 'xl'); cardStyle(ev, 'lg'); row.appendChild(ev); fixW(ev, 380);
+  ev.layoutSizingVertical = 'FILL';
+  ev.appendChild(await T('События за месяц', 'h2', 'color/text/primary'));
+  const dwrap = AL('HORIZONTAL', 'Кольцо'); dwrap.primaryAxisAlignItems = 'CENTER'; append(ev, dwrap, { fillW: true });
+  await donut(dwrap, [[9, 'critical'], [34, 'major'], [77, 'warning']], '120', 'событий', 168);
+  const lg = AL('VERTICAL', 'Легенда'); lg.itemSpacing = 12; append(ev, lg, { fillW: true });
   for (const [lvl, n, p] of [['CRITICAL', '9', '8 %'], ['MAJOR', '34', '28 %'], ['WARNING', '77', '64 %']]) {
     const l = inst(K.legend, { 'Уровень': lvl }); l.setProperties({ [K.legendNum]: n, [K.legendPct]: p }); append(lg, l, { fillW: true });
   }
-  const ln = figma.createRectangle(); ln.name = 'Линия'; ln.resize(100, 1); fill(ln, 'color/line/default'); append(left, ln, { fillW: true });
-  left.appendChild(await T('Инциденты по услугам', 'h2', 'color/text/primary'));
-  const bars = AL('VERTICAL', 'Полосы'); bars.itemSpacing = 10; append(left, bars, { fillW: true });
-  for (const sv of SERVICES) await serviceBar(bars, sv.short, [[sv.inc[0], 'critical'], [sv.inc[1], 'major']], 56);
-
-  const right = AL('VERTICAL', 'Таблица'); right.itemSpacing = 4; pad(right, 'lg', 'lg'); append(mb, right, { grow: true });
-  left.layoutSizingVertical = 'FILL';
-  const ttl = await T('Детализация по ИТ-услугам', 'h2', 'color/text/primary'); right.appendChild(ttl);
-  const sp = figma.createFrame(); sp.name = 'Отступ'; sp.resize(1, 8); sp.fills = []; right.appendChild(sp);
-  const COLS = [['ИТ-услуга', null], ['Доступность', 104], ['В нормативе', 104], ['CRITICAL', 84], ['MAJOR', 84], ['WARNING', 84], ['30 дней', 196]];
-  const hr = AL('HORIZONTAL', 'Заголовок'); hr.itemSpacing = 4; append(right, hr, { fillW: true });
-  for (const [name, w] of COLS) {
-    let c;
-    if (SEV[name]) { c = inst(K.headCell, { 'Уровень': name }); c.setProperties({ [K.headCellText]: name }); hr.appendChild(c); c.resize(w, 40); continue; }
-    c = AL('HORIZONTAL', name); c.counterAxisAlignItems = 'CENTER'; c.paddingLeft = 12; c.paddingRight = 12; rad(c, 'sm'); fill(c, 'color/bg/wash');
-    hr.appendChild(c);
-    if (w) fixBox(c, w, 40); else { c.resize(100, 40); c.counterAxisSizingMode = 'FIXED'; c.layoutGrow = 1; }
-    c.appendChild(await T(name, 'cellBold', 'color/text/primary'));
-  }
-  for (const sv of SERVICES) {
-    const r = AL('HORIZONTAL', sv.short); r.itemSpacing = 4; append(right, r, { fillW: true });
-    const nm = AL('VERTICAL', 'Услуга'); nm.itemSpacing = 2; nm.primaryAxisAlignItems = 'CENTER'; nm.paddingLeft = 12; nm.paddingRight = 12; rad(nm, 'sm'); fill(nm, 'color/bg/wash');
-    r.appendChild(nm); nm.resize(100, 52); nm.primaryAxisSizingMode = 'FIXED'; nm.layoutGrow = 1;
-    nm.appendChild(await T(sv.name, 'cellBold', 'color/text/primary'));
-    const stI = inst(K.status, { 'Статус': sv.st }); nm.appendChild(stI);
-    nm.resize(100, 64);
-    for (const [val, w, warn] of [[sv.av, 104, sv.av === '99,90 %'], [sv.inTime, 104, parseFloat(sv.inTime.replace(',', '.')) < 95]]) {
-      const c = AL('HORIZONTAL', 'Значение'); center(c); rad(c, 'sm'); fill(c, warn ? 'color/major/subtle' : 'color/bg/wash'); r.appendChild(c); fixBox(c, w, 64);
-      c.appendChild(await T(val, 'cellBold', warn ? 'color/major/strong' : 'color/text/primary'));
-    }
-    sv.ev.forEach((v, i) => {
-      const lvl = ['CRITICAL', 'MAJOR', 'WARNING'][i];
-      const c = inst(K.cell, { 'Заливка': v ? 'Цвет' : 'Тон', 'Уровень': lvl }); c.setProperties({ [K.cellText]: String(v) }); r.appendChild(c); c.resize(84, 64);
-    });
-    const strip = AL('HORIZONTAL', '30 дней'); strip.itemSpacing = 2; strip.counterAxisAlignItems = 'CENTER'; center(strip); rad(strip, 'sm'); fill(strip, 'color/bg/wash'); r.appendChild(strip); fixBox(strip, 196, 64);
-    for (let i = 0; i < 30; i++) {
-      const ch = sv.days.charAt(i);
-      const role = ch === '0' ? 'ok' : ch === '1' ? 'warning' : ch === '2' ? 'major' : 'critical';
-      const b = figma.createRectangle(); b.name = `День ${i + 1}`; b.resize(4, 28); b.cornerRadius = 1.5; fill(b, ch === '0' ? 'color/ok/muted' : `color/${role}/default`); strip.appendChild(b);
-    }
-  }
-  const note = await T('Ячейка с нулём — бледный тон, с событиями — насыщенный цвет. Полоса — дни месяца: цвет дня — худший уровень событий за день.', 'small', 'color/text/secondary'); right.appendChild(note);
   return s;
 }
 
@@ -1127,8 +1058,8 @@ async function buildScreens(page, K) {
   await figma.setCurrentPageAsync(page);
   const root = rootFrame(`${KIT} · Экраны`, page);
   root.layoutMode = 'HORIZONTAL'; root.itemSpacing = 80; root.counterAxisAlignItems = 'MIN';
-  const mon = await monitoringScreen(root, K);
-  await eventDialogScreen(root, K, mon);
+  await monitoringScreen(root, K);
+  await eventCardScreen(root, K);
   await dashboardScreen(root, K);
   await widgetScreen(root, K);
   return root;
